@@ -59,7 +59,6 @@ if resultado:
 else:
     print("Nenhum registro encontrado.\n")
 
-#flask
 @app.route('/')
 def index():
     conn_local = sqlite3.connect(DB_NAME)
