@@ -1,0 +1,51 @@
+body { 
+    font-family: sans-serif; 
+    margin: 0; 
+    padding: 0; 
+    display: flex; 
+    height: 100vh; 
+    overflow: hidden; 
+}
+
+/* Ajuste para exibir corretamente as estatísticas e manter o mapa ao lado */
+#stats {
+    width: 280px;      /* largura suficiente para mostrar as estatísticas */
+    min-width: 220px;
+    padding: 20px;
+    overflow-y: auto;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    background-color: #f9f9f9;
+    border-right: 1px solid #ddd;
+}
+
+/* Conteiner do mapa: ocupa o restante do espaço e delimita o mapa absoluto */
+#mapa {
+    flex: 1;           /* ocupa o restante do espaço ao lado de #stats */
+    position: relative;/* torna #mapa o ancestor posicionado do filho absoluto */
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* O elemento do plotly continua absoluto, mas agora fica preso dentro de #mapa */
+#mapa > div {
+    position: absolute !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto !important;
+    height: 100% !important;
+}
+ 
+h2, h3 { 
+    border-bottom: 1px solid #ccc; 
+    padding-bottom: 5px; 
+    margin-top: 10px; 
+}
+ul { 
+    padding-left: 5px; 
+    list-style: none; 
+} 
+li { 
+    margin-bottom: 8px; 
+} 
