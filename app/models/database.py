@@ -4,10 +4,45 @@ import pandas as pd
 
 DB_NAME = "desaparecidos.db"
 
+# --- V45: Definir IMG_DIR e PROXIES aqui ---
+# (Para que o web_scraping.py possa importá-los)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Assume que a pasta 'source' está dois níveis acima (na raiz do projeto)
+IMG_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "source"))
+
+PROXIES = {
+    "http": 'http://atalaia:proj0Talaia992025@proxy.dpf.gov.br:8080',
+    "https": 'http://atalaia:proj0Talaia992025@proxy.dpf.gov.br:8080'
+}
+# --- FIM DA ADIÇÃO ---
+
+
 def connection_db():
     conn = sqlite3.connect(DB_NAME, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
+
+def delet():
+    """Deleta APENAS os registros da fonte CNPD"""
+    conn = connection_db()
+    cursor = conn.cursor()
+    try:
+        print("--- V45: Deletando registros antigos do CNPD... ---")
+        cursor.execute("DELETE FROM desaparecidos WHERE fonte = 'cnpd.mj.gov.br'")
+        
+        # --- CORREÇÃO V45: Adicionado conn.commit() ---
+        conn.commit() 
+        # --- FIM DA CORREÇÃO ---
+        
+        print(f"✅ Dados da fonte CNPD deletados com sucesso! {cursor.rowcount} linhas afetadas.")
+    
+    except Exception as e:
+        print(f"❌ Erro ao deletar dados: {e}")
+    finally:
+        # --- CORREÇÃO V45: Adicionado conn.close() ---
+        conn.close()
+        # --- FIM DA CORREÇÃO ---
+
 
 def init_db():
     conn = connection_db()
@@ -29,7 +64,7 @@ def init_db():
             pagina INTEGER,
             status TEXT,
             fonte TEXT,
-            UNIQUE(id, fonte)
+            UNIQUE(cnpd_id, fonte) -- CORREÇÃO V45: 'id' -> 'cnpd_id'
         )
     """)
 
@@ -44,13 +79,16 @@ def init_db():
 
     for coluna in colunas_necessarias:
         if coluna not in existentes:
-            cursor.execute(f"ALTER TABLE desaparecidos ADD COLUMN {coluna} TEXT")
+            try:
+                cursor.execute(f"ALTER TABLE desaparecidos ADD COLUMN {coluna} TEXT")
+            except sqlite3.OperationalError as e:
+                print(f"Aviso: Não foi possível adicionar coluna {coluna}. {e}")
 
     conn.commit()
     conn.close()
     print("✅ Banco de dados inicializado corretamente.")
 
-# ----- CONSULTAS -----
+# ----- CONSULTAS ----- (Sem alterações)
 
 def buscar_desaparecido_por_nome(nome):
     conn = connection_db()
@@ -91,3 +129,15 @@ def mostrar_estatisticas_por_estado(cursor):
     cursor.execute("SELECT COUNT(*) FROM desaparecidos")
     total = cursor.fetchone()[0]
     print(f"Total geral: {total}")
+
+# --- CORREÇÃO V45: Bloco para executar a limpeza ---
+if __name__ == "__main__":
+    print("--- EXECUTANDO SCRIPT DE BANCO DE DADOS DIRETAMENTE ---")
+    # 1. Inicializa (cria a tabela e colunas se não existirem)
+    init_db()
+    
+    # 2. Deleta os dados antigos do CNPD
+    delet()
+    
+    print("--- SCRIPT DE BANCO DE DADOS CONCLUÍDO ---")
+# --- FIM DA CORREÇÃO ---
