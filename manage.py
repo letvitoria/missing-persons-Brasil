@@ -39,10 +39,10 @@ if __name__ == "__main__":
     logging.info("Configurando o agendador de tarefas...")
     scheduler = BackgroundScheduler(daemon=True)
     #Configurando o trigger para rodar no horário definido:
-    scheduler.add_job(agendar_tarefa_scraping, trigger='cron', hour=10, minute =35)
+    scheduler.add_job(agendar_tarefa_scraping, trigger='cron', hour=10, minute =45)
     #Inicia o agendador em um thread de fundo
     scheduler.start()
-    logging.info("Agendador iniciado. O scraping rodará diariamente às #.")
+    logging.info("Agendador iniciado. O scraping rodará diariamente às 10:45.")
     
     logging.info("--- [INICIALIZAÇÃO] Executando o scraping pela primeira vez... ---")
     agendar_tarefa_scraping()
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     logging.info("Inicniando servidor Web")
     app = create_app()
     port = int(os.environ.get("PORT", 5001)) 
-    logging.info(f"Servidor pronto. Acesse na sua rede em: http://0.0.0.0:{port}")
+    logging.info(f"Servidor pronto. Acesse na sua rede em: http://localhost:{port}")
     serve(app, host='0.0.0.0', port=port)
 
 

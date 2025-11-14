@@ -4,18 +4,14 @@ import pandas as pd
 
 DB_NAME = "desaparecidos.db"
 
-# --- V45: Definir IMG_DIR e PROXIES aqui ---
-# (Para que o web_scraping.py possa importá-los)
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Assume que a pasta 'source' está dois níveis acima (na raiz do projeto)
 IMG_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "source"))
 
 PROXIES = {
     "http": 'http://atalaia:proj0Talaia992025@proxy.dpf.gov.br:8080',
     "https": 'http://atalaia:proj0Talaia992025@proxy.dpf.gov.br:8080'
 }
-# --- FIM DA ADIÇÃO ---
-
 
 def connection_db():
     conn = sqlite3.connect(DB_NAME, check_same_thread=False)
@@ -29,19 +25,15 @@ def delet():
     try:
         print("--- V45: Deletando registros antigos do CNPD... ---")
         cursor.execute("DELETE FROM desaparecidos WHERE fonte = 'cnpd.mj.gov.br'")
-        
-        # --- CORREÇÃO V45: Adicionado conn.commit() ---
         conn.commit() 
-        # --- FIM DA CORREÇÃO ---
+        
         
         print(f"✅ Dados da fonte CNPD deletados com sucesso! {cursor.rowcount} linhas afetadas.")
     
     except Exception as e:
         print(f"❌ Erro ao deletar dados: {e}")
     finally:
-        # --- CORREÇÃO V45: Adicionado conn.close() ---
         conn.close()
-        # --- FIM DA CORREÇÃO ---
 
 
 def init_db():
