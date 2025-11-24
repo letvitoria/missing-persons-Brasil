@@ -56,11 +56,11 @@ def init_db():
             pagina INTEGER,
             status TEXT,
             fonte TEXT,
-            UNIQUE(cnpd_id, fonte) -- CORREÇÃO V45: 'id' -> 'cnpd_id'
+            UNIQUE(cnpd_id, fonte) 
         )
     """)
 
-    # --- GARANTIR QUE TODAS AS COLUNAS EXISTEM ---
+    
     colunas_necessarias = [
         "cnpd_id", "idade", "instituicao", "estado",
         "foto_url", "img_path", "pagina", "status", "fonte"
@@ -80,7 +80,7 @@ def init_db():
     conn.close()
     print("✅ Banco de dados inicializado corretamente.")
 
-# ----- CONSULTAS ----- (Sem alterações)
+
 
 def buscar_desaparecido_por_nome(nome):
     conn = connection_db()
@@ -122,14 +122,13 @@ def mostrar_estatisticas_por_estado(cursor):
     total = cursor.fetchone()[0]
     print(f"Total geral: {total}")
 
-# --- CORREÇÃO V45: Bloco para executar a limpeza ---
+
 if __name__ == "__main__":
     print("--- EXECUTANDO SCRIPT DE BANCO DE DADOS DIRETAMENTE ---")
-    # 1. Inicializa (cria a tabela e colunas se não existirem)
+    
     init_db()
     
-    # 2. Deleta os dados antigos do CNPD
+    
     delet()
     
     print("--- SCRIPT DE BANCO DE DADOS CONCLUÍDO ---")
-# --- FIM DA CORREÇÃO ---
