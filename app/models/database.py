@@ -1,39 +1,63 @@
 import sqlite3
 import os
 import pandas as pd
+import unicodedata
+import re
 
-DB_NAME = "desaparecidos.db"
+
+# Pega o diretório onde este arquivo (database.py) está: .../app/models
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Sobe dois níveis para chegar na raiz do projeto: .../DESAPARECIDOS_MVC1
+PROJECT_ROOT = os.path.dirname(os.path.dirname(CURRENT_DIR))
+
+# Define o caminho ABSOLUTO do banco de dados
+DB_PATH = os.path.join(PROJECT_ROOT, "desaparecidos.db")
 
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-IMG_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "source"))
+# Ajuste de caminhos para imagens (se necessário)
+IMG_DIR = os.path.join(PROJECT_ROOT, "source")
 
 PROXIES = {
     "http": 'http://atalaia:proj0Talaia992025@proxy.dpf.gov.br:8080',
     "https": 'http://atalaia:proj0Talaia992025@proxy.dpf.gov.br:8080'
 }
 
+
 def connection_db():
-    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
-def delet():
-    """Deleta APENAS os registros da fonte CNPD"""
-    conn = connection_db()
-    cursor = conn.cursor()
-    try:
-        print("--- V45: Deletando registros antigos do CNPD... ---")
-        cursor.execute("DELETE FROM desaparecidos WHERE fonte = 'cnpd.mj.gov.br'")
-        conn.commit() 
-        
-        
-        print(f"✅ Dados da fonte CNPD deletados com sucesso! {cursor.rowcount} linhas afetadas.")
-    
-    except Exception as e:
-        print(f"❌ Erro ao deletar dados: {e}")
-    finally:
-        conn.close()
+
+
+estados_uf = {
+    "Rondônia": "RO", "Acre": "AC", "Amazonas": "AM", "Roraima": "RR", "Pará": "PA",
+    "Amapá": "AP", "Tocantins": "TO", "Maranhão": "MA", "Piauí": "PI", "Ceará": "CE",
+    "Rio Grande do Norte": "RN", "Paraíba": "PB", "Pernambuco": "PE", "Alagoas": "AL",
+    "Sergipe": "SE", "Bahia": "BA", "Minas Gerais": "MG", "Espírito Santo": "ES",
+    "Rio de Janeiro": "RJ", "São Paulo": "SP", "Paraná": "PR", "Santa Catarina": "SC",
+    "Rio Grande do Sul": "RS", "Mato Grosso": "MT", "Mato Grosso do Sul": "MS",
+    "Goiás": "GO", "Distrito Federal": "DF"
+}
+
+uf_estados = {
+    "AC": "Acre", "AL": "Alagoas", "AP": "Amapá", "AM": "Amazonas", "BA": "Bahia",
+    "CE": "Ceará", "DF": "Distrito Federal", "ES": "Espírito Santo", "GO": "Goiás",
+    "MA": "Maranhão", "MT": "Mato Grosso", "MS": "Mato Grosso do Sul", "MG": "Minas Gerais",
+    "PA": "Pará", "PB": "Paraíba", "PR": "Paraná", "PE": "Pernambuco", "PI": "Piauí",
+    "RJ": "Rio de Janeiro", "RN": "Rio Grande do Norte", "RS": "Rio Grande do Sul",
+    "RO": "Rondônia", "RR": "Roraima", "SC": "Santa Catarina", "SP": "São Paulo",
+    "SE": "Sergipe", "TO": "Tocantins"
+}
+
+def normalize(text):
+    if pd.isna(text):
+        return ""
+    s = str(text).strip().lower()
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+    return s
+
 
 
 def init_db():
@@ -56,14 +80,14 @@ def init_db():
             pagina INTEGER,
             status TEXT,
             fonte TEXT,
-            UNIQUE(cnpd_id, fonte) -- CORREÇÃO V45: 'id' -> 'cnpd_id'
-        )
+            situacao TEXT,
+            UNIQUE(cnpd_id, fonte)
+            )
     """)
-
-    # --- GARANTIR QUE TODAS AS COLUNAS EXISTEM ---
+    #Campo "situação" inserido para diferenciar desaparecidos de encontrados (falecidos e localizados)
     colunas_necessarias = [
         "cnpd_id", "idade", "instituicao", "estado",
-        "foto_url", "img_path", "pagina", "status", "fonte"
+        "foto_url", "img_path", "pagina", "status", "fonte", "situacao"
     ]
 
     cursor.execute("PRAGMA table_info(desaparecidos)")
@@ -80,7 +104,6 @@ def init_db():
     conn.close()
     print("✅ Banco de dados inicializado corretamente.")
 
-# ----- CONSULTAS ----- (Sem alterações)
 
 def buscar_desaparecido_por_nome(nome):
     conn = connection_db()
@@ -92,21 +115,93 @@ def buscar_desaparecido_por_nome(nome):
     else:
         print(f"Nenhum resultado encontrado para {nome}\n")
 
-def get_dados_mapa(query, conn):
+
+def apagar_desaparecido_por_nome(nome):
+    """
+    Apaga todos os registros da tabela `desaparecidos` onde `nome` é exatamente igual
+    ao valor passado. Retorna o número de registros apagados.
+
+    Uso:
+        deletados = apagar_desaparecido_por_nome('Nome Sobrenome')
+    """
+    conn = connection_db()
+    cursor = conn.cursor()
     try:
-        df = pd.read_sql_query(query, conn)
+        cursor.execute("DELETE FROM desaparecidos WHERE nome = ?", (nome,))
+        deleted = cursor.rowcount
+        conn.commit()
+        print(f"Registros apagados para '{nome}': {deleted}")
+        return deleted
+    except Exception as e:
+        print(f"Erro ao apagar registros para '{nome}': {e}")
+        conn.rollback()
+        return 0
+    finally:
+        conn.close()
+
+def get_dados_mapa(query_ignorada, conn):
+    """
+    Retorna o DataFrame para o mapa. 
+    Ignora a query passada e usa uma query interna com COUNT(DISTINCT) 
+    para evitar duplicatas.
+    """
+    try:
+        # Usa concatenação (||) para simular DISTINCT em múltiplas colunas
+        query_corrigida = """
+            SELECT 
+                estado, 
+                COUNT(DISTINCT nome || IFNULL(idade,'') || IFNULL(local,'')) as quantidade 
+            FROM desaparecidos 
+            GROUP BY estado
+        """
+        
+        df = pd.read_sql_query(query_corrigida, conn)
+        
         if "estado" not in df.columns:
             df["estado"] = None
         if "quantidade" not in df.columns:
             df["quantidade"] = 0
-        return df
+
+        # normaliza a coluna
+        df["estado_norm"] = df["estado"].apply(normalize)
+
+        # cria mapeamento normalizado
+        normalized_to_uf = {normalize(k): v for k, v in estados_uf.items()}
+
+        # mapear para UF
+        df["uf"] = df["estado_norm"].map(normalized_to_uf)
+
+        # lidar com siglas já fornecidas
+        mask_no_uf = df["uf"].isna() & df["estado"].notna()
+        maybe_sigla = df.loc[mask_no_uf, "estado"].astype(str).str.strip().str.upper()
+        valid_ufs = set(uf_estados.keys())
+        mask_sigla_valida = maybe_sigla.str.len().eq(2) & maybe_sigla.isin(valid_ufs)
+        df.loc[mask_no_uf & mask_sigla_valida, "uf"] = maybe_sigla[mask_sigla_valida].values
+
+        # obter nome canônico (nome por extenso dos UF)
+        df["estado_canonico"] = df["uf"].map(uf_estados).fillna(df["estado"])
+
+        # agregar por UF / estado canônico
+        result = df.groupby(["uf", "estado_canonico"], dropna=False, as_index=False)["quantidade"].sum()
+        result = result.rename(columns={"estado_canonico": "estado"})
+        return result[["estado", "uf", "quantidade"]]
     except Exception as e:
-        print(f"Erro em get_dados_mapa: {e}")
-        return pd.DataFrame(columns=["estado", "quantidade"])
+        print(f"Erro crítico em get_dados_mapa: {e}")
+        return pd.DataFrame(columns=["estado", "uf", "quantidade"])
 
 def mostrar_estatisticas_por_estado(cursor):
     print("\n--- 📊 Estatísticas por Estado ---")
-    query = "SELECT estado, COUNT(*) FROM desaparecidos GROUP BY estado ORDER BY COUNT(*) DESC"
+    
+    # Consulta via query para retornar apenas resultados não duplicados
+    query = """
+        SELECT 
+            estado, 
+            COUNT(DISTINCT nome || IFNULL(idade,'') || IFNULL(local,'')) as qtd
+        FROM desaparecidos 
+        GROUP BY estado 
+        ORDER BY qtd DESC
+    """
+    
     cursor.execute(query)
     resultados = cursor.fetchall()
 
@@ -114,22 +209,48 @@ def mostrar_estatisticas_por_estado(cursor):
         print("Nenhum dado encontrado.")
         return
 
+    # cria mapa normalizado
+    normalized_to_uf = {normalize(k): v for k, v in estados_uf.items()}
+    #Retorna os nomes dos estados por extenso:
+    def format_nome_estado(estado_value):
+        if not estado_value:
+            return "Não especificado"
+        s = str(estado_value).strip()
+        maybe = s.upper()
+        if len(maybe) == 2 and maybe in uf_estados:
+            return uf_estados[maybe]
+        m = re.search(r'(.+?)\s*-\s*([A-Za-z]{2})$', s)
+        if m:
+            uf = m.group(2).upper()
+            if uf in uf_estados:
+                return uf_estados[uf]
+            return m.group(1).strip()
+        nn = normalize(s)
+        if nn in normalized_to_uf:
+            uf = normalized_to_uf[nn]
+            return uf_estados.get(uf, s)
+        for uf, full in uf_estados.items():
+            if normalize(full) == nn:
+                return full
+        return s
+
     for estado, qtd in resultados:
-        estado_nome = estado if estado else "Não especificado"
+        estado_nome = format_nome_estado(estado)
         print(f"📍 {estado_nome}: {qtd} desaparecidos")
 
-    cursor.execute("SELECT COUNT(*) FROM desaparecidos")
+    # Total Geral 
+    cursor.execute("SELECT COUNT(DISTINCT nome || IFNULL(idade,'') || IFNULL(local,'')) FROM desaparecidos")
     total = cursor.fetchone()[0]
     print(f"Total geral: {total}")
 
-# --- CORREÇÃO V45: Bloco para executar a limpeza ---
+def apagar_nomes_repetidos(cursor):
+    cursor.execute("""
+
+                   """)
 if __name__ == "__main__":
     print("--- EXECUTANDO SCRIPT DE BANCO DE DADOS DIRETAMENTE ---")
-    # 1. Inicializa (cria a tabela e colunas se não existirem)
     init_db()
+    mostrar_estatisticas_por_estado(connection_db().cursor())
     
-    # 2. Deleta os dados antigos do CNPD
-    delet()
-    
+    #apagar_desaparecido_por_nome('nome_completo')
     print("--- SCRIPT DE BANCO DE DADOS CONCLUÍDO ---")
-# --- FIM DA CORREÇÃO ---
