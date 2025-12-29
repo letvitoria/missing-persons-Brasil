@@ -139,10 +139,10 @@ def apagar_desaparecido_por_nome(nome):
     finally:
         conn.close()
 
-def get_dados_mapa(query_ignorada, conn):
+def get_dados_mapa(query_corrigida,conn):
     """
     Retorna o DataFrame para o mapa. 
-    Ignora a query passada e usa uma query interna com COUNT(DISTINCT) 
+    Ignora a query passada e usa uma query interna com COUNT(DISTINCT) (verifica a relação entre nome, idade e local)
     para evitar duplicatas.
     """
     try:
@@ -209,7 +209,7 @@ def mostrar_estatisticas_por_estado(cursor):
         print("Nenhum dado encontrado.")
         return
 
-    # cria mapa normalizado
+   
     normalized_to_uf = {normalize(k): v for k, v in estados_uf.items()}
     #Retorna os nomes dos estados por extenso:
     def format_nome_estado(estado_value):
@@ -243,10 +243,6 @@ def mostrar_estatisticas_por_estado(cursor):
     total = cursor.fetchone()[0]
     print(f"Total geral: {total}")
 
-def apagar_nomes_repetidos(cursor):
-    cursor.execute("""
-
-                   """)
 if __name__ == "__main__":
     print("--- EXECUTANDO SCRIPT DE BANCO DE DADOS DIRETAMENTE ---")
     init_db()

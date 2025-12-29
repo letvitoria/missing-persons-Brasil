@@ -85,13 +85,14 @@ def tratar_null(valor):
 for linha in linhas:
   # Supondo que as colunas estão na ordem: CPF, BNMP, Nome, Filiacao1, Filiacao2, DN, Natural de:, RG:, Sexo, Tipificação Penal:, Status
   #id = linha[0]
+  #O que é BNMP?
   cpf = tratar_null(linha[5])
   nome = tratar_null(linha[1])
   filiacao1 = tratar_null(linha[4])
   filiacao2 = tratar_null(linha[3])
   dn = tratar_null(linha[2])
   dn_transf = converter_data(dn)
-  #natural_de = tratar_null(linha[12])
+  natural_de = tratar_null(linha[12])
   rg_raw = tratar_null(linha[6])
   rg = rg_raw.replace('*','')
   img_path = linha[8]
@@ -114,7 +115,6 @@ for linha in linhas:
     }
   }
   
-
   headers = {
     'Accept': 'application/json',
     'Authorization': f'Token {token}'  # Usando o token obtido
@@ -126,15 +126,17 @@ for linha in linhas:
     data_r = response.json()
     #print (data_r)
     # Obter o valor do 'id'
+    #Provavelmente não se aplica p/ os IDS do CNPD
     id_value = data_r['id']
     created_date = data_r['created_date']
 
     #Inserir a foto
     #img_path = rf"C:\mitra\RO\images\{}"
+    #Pega a imagem desse diretório e manda pro FF?
     if os.path.exists(img_path):
       print(f'o arquivo {img_path} existe') 
 
-      url_detect = 'http://10.69.7.31/detect'
+      url_detect = 'http://10.69.7.31/detect' #url do FindFace
 
       payload={
         'face':{

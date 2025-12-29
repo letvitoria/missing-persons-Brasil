@@ -87,7 +87,7 @@ class HomeController:
         Função PRIVADA da View: Recebe dados normalizados, gera o mapa Plotly 
         e retorna seu HTML.
         '''
-        print("\n Gerando mapeamento...")
+        print("\nGerando mapeamento...")
         df_dados = df_dados_normalizados.copy() # Usa os dados recebidos
 
         # Calcula o valor máximo para o range

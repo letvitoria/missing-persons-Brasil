@@ -31,7 +31,7 @@ def agendar_tarefa_scraping():
     if not SCRAPER_DISPONIVEL:
         logging.warning("[AGENDADO] Scraping ignorado (arquivo não encontrado)")
         return
-    logging.info("--- [AGENDADO] INICIANDO SCRAPING DIÁRIO ---")
+    logging.info("[AGENDADO] INICIANDO SCRAPING DIÁRIO ---")
     #try:
     #    scraper_main()
     #    logging.info("--- [AGENDADO] SCRAPING DIÁRIO CONCLUÍDO ---")
@@ -73,14 +73,14 @@ if __name__ == "__main__":
     logging.info("Configurando o agendador de tarefas...")
     scheduler = BackgroundScheduler(daemon=True)
     # Configurando o trigger para rodar no horário definido:
-    scheduler.add_job(agendar_tarefa_scraping, trigger='cron', hour=10, minute=00)
+    scheduler.add_job(agendar_tarefa_scraping, trigger='cron', hour=11, minute=40)
     scheduler.start()
     logging.info("Agendador iniciado. O scraping rodará diariamente às 10:00h")
     
-    logging.info("--- [INICIALIZAÇÃO] Executando o scraping pela primeira vez... ---")
+    logging.info(" [INICIALIZAÇÃO] Executando o scraping pela primeira vez... ---")
     # Rodamos o scraper na inicialização para popular o banco imediatamente
     agendar_tarefa_scraping()
-    logging.info("--- [INICIALIZAÇÃO] Scraping inicial concluído. ---")
+    logging.info("[INICIALIZAÇÃO] Scraping inicial concluído. ---")
     
     # Iniciando servidor web
     logging.info("Iniciando servidor Web")

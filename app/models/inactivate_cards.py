@@ -27,7 +27,7 @@ auth_url = 'http://10.69.7.31/auth/login/'
 # Corpo da requisição (dados do dispositivo)
 auth_data = {
     "video_auth_token": "A",  # Substitua com o token de autenticação de vídeo, se necessário
-    "uuid": "1D9D84D5-E18C-1407-4F77-8F29EF7F5A07",       # Substitua pelo UUID real do seu dispositivo
+    "uuid": "1D9D84D5-E18C-1407-4F77-8F29EF7F5A07",       # Substitua pelo UUID real do seu dispositivo (feito)
     "mobile": False,          # Se for um dispositivo móvel ou não
     "device_info": {}         # Informações adicionais sobre o dispositivo (se necessário)
 }
@@ -45,7 +45,7 @@ response = requests.post(auth_url, headers=header, data=json.dumps(auth_data))
 if response.status_code == 200:
     # O token de autenticação estará na resposta JSON
     auth_response = response.json()
-    token = auth_response.get('token')  # Ajuste conforme o nome da chave na resposta
+    token = auth_response.get('token')  #Ajuste conforme o nome da chave na resposta
     if token:
         print(f'Token de autenticação obtido: Token {token}')
     else:
@@ -54,9 +54,9 @@ else:
     print(f'Falha ao obter o token: {response.status_code}')
     print(response.text)
 
-url_cards = 'http://10.69.7.31/cards/humans/' # Da onde? 
+url_cards = 'http://10.69.7.31/cards/humans/' #Verificar origem da url no ff
 
-# Selecionar as linhas com Status = "new"
+# Selecionar as linhas com Status = "new" from DB
 cursor.execute("SELECT * FROM desaparecidos WHERE Status = 'new'") #adaptar para o db
 linhas = cursor.fetchall()
 def tratar_null(valor):
@@ -95,14 +95,13 @@ for linha in linhas:
             
             # Agora, fazer a requisição GET para o endpoint
         
-
         if human_id != None: 
             if face_objects == 0:
                 url_delete = f'http://10.69.7.31/cards/humans/{human_id}/'
                 response = requests.delete(url_delete, headers=headers)
                 if response.status_code == 204:
                     print("Card humano sem foto apagado com sucesso!")
-                    cursor.execute("UPDATE dados_csv SET Status = 'inactive' WHERE BNMP = ?", (bnmp,))
+                    cursor.execute("UPDATE dados_csv SET Status = 'inactive' WHERE BNMP = ?", (bnmp,)) #Atualizar para meu DB
                     
                 else:
                     print("Erro ao atualizar o card humano!")
