@@ -30,8 +30,8 @@ Este projeto tem como objetivo principal centralizar e unificar essas informaç�
 
 * **Backend:** Python, Flask
 * **Visualização:** Plotly
-* **Coleta de Dados:** (Ex: BeautifulSoup, Scrapy, Requests - *adicione a que você usou*)
-* **Banco de Dados:** (Ex: SQLite, PostgreSQL - *adicione o que você usou*)
+* **Coleta de Dados:** BeautifulSoup
+* **Banco de Dados:** SQlite3
 
 ## Planos Futuros
 
