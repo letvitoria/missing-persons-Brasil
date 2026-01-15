@@ -11,7 +11,7 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(CURRENT_DIR))
 
 # Define o caminho ABSOLUTO do banco de dados
-DB_PATH = os.path.join(PROJECT_ROOT, "desaparecidos.db")
+DB_PATH = os.path.join(PROJECT_ROOT, "pessoasdesaparecidas.db")
 
 
 # Ajuste de caminhos para imagens (se necessário)

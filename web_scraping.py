@@ -10,6 +10,7 @@ import base64
 import urllib3
 import zipfile
 import sys
+import hashlib
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager #GErenciador de Drivers
@@ -22,6 +23,7 @@ from selenium_stealth import stealth
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.core.os_manager import OperationSystemManager
 from webdriver_manager.core.http import HttpClient
+from selenium.webdriver.common.keys import Keys
 
 # Desativa os warnings de SSL (verify=False)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -43,7 +45,7 @@ except ImportError as e:
     print(f"Erro de importação: {e}")
     print("--- Usando configurações de feedback forçadas ---")
     #Informando manualmente o caminho para o arquivo do banco de dados. 
-    DB_NAME = os.path.join(BASE_DIR_SCRAPER, "desaparecidos.db")
+    DB_NAME = os.path.join(BASE_DIR_SCRAPER, "pessoasdesaparecidas.db")
     PROXIES = {
         "http": 'http://atalaia:proj0Talaia992025@proxy.dpf.gov.br:8080',
         "https": 'https://atalaia:proj0Talaia992025@proxy.dpf.gov.br:8080'
@@ -144,7 +146,18 @@ def scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate: bool):
                 situacao = "falecido"
 
             foto_tag = card.find("img", class_="pessoa-img")
-            foto_url = urljoin("https://desaparecidosbrasil.org/", foto_tag['src']) if foto_tag and foto_tag.get('src') else None
+            foto_url_relative = foto_tag['src'] if foto_tag and foto_tag.get("src") else ""
+            #Monta a url 
+            foto_url = urljoin("https://desaparecidosdobrasil.org/",foto_url_relative)
+
+            #Ignorar registros sem foto válida
+            if 'sem-foto' in foto_url_relative.lower() or not foto_url_relative:
+                nome_ignorado = card.find("h4").get_text(strip=True) if card.find("h4") else "Desconhecido"
+                logging.info(f"⏭️ Ignorando registro (Sem foto válida): {nome_ignorado}")
+                continue #Passa para o próximo card
+
+            # Daqui para baixo o código só executa se houver uma foto real
+            card_text = card.get_text().lower()
 
             cursor.execute("SELECT id, img_path, situacao FROM desaparecidos WHERE foto_url = ?", (foto_url,))
             registro_existente = cursor.fetchone()
@@ -441,7 +454,7 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
                     
                     # ESPERA INTELIGENTE: Tentará por até 20 segundos (40 iterações de 0.5s)
                     sucesso_mudanca = False
-                    for i in range(40): 
+                    for i in range(80): 
                         time.sleep(0.5)
                         # Executa o script JS para ver o que está na tela agora
                         novos_cards = driver.execute_script(JS_SCRAPER_SCRIPT)

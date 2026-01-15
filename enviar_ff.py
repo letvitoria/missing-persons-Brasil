@@ -7,34 +7,41 @@ import base64
 import requests
 import json
 from datetime import datetime
-#from app.models import database
 
+#Lista de procurados
 def converter_data(data):
-  try:
-    # Tenta converter a data no formato DD/MM/AAAA
-    ano = data[:4]
-    mes = data[4:6]
-    dia = data[6:8]
+    if not data or str(data).strip() == "":
+        return ""
     
-    # Retorna a data formatada
-    return f"{ano}-{mes}-{dia}"
-  except ValueError:
-    # Caso a data não esteja no formato correto
-    data_formatada=""
-    return data_formatada
-  
+    try:
+        # Remove qualquer caractere que não seja número (trata 09.08.2001 ou 09/08/2001)
+        nums = re.sub(r'\D', '', str(data))
+        
+        if len(nums) == 8:
+            dia = nums[:2]
+            mes = nums[2:4]
+            ano = nums[4:]
+            
+            # Retorna no padrão ISO (AAAA-MM-DD), que é o padrão internacional
+            # Se a sua API exige o padrão BR, use f"{dia}/{mes}/{ano}"
+            return f"{ano}-{mes}-{dia}"
+        return ""
+    except Exception:
+        return ""
 
 # Caminho para o banco de dados SQLite
-db_path = "desaparecidos.db"
-
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) #Alterado 
+db_path = os.path.join(BASE_DIR, "pessoasdesaparecidas.db")
 # Conectar ao banco de dados SQLite
 conn = sqlite3.connect(db_path)
+conn.row_factory = sqlite3.Row # Isso permite usar linha['nome'] em vez de linha[1]
 cursor = conn.cursor()
 
 
 # Detalhes de autenticação básica
-username = 'linux'  # Substitua pelo seu nome de usuário (From Findface)
-password = 'ubuntuff2025'     # Substitua pela sua senha (From Findface)
+username = 'linux'  # Alterado
+password = 'ubuntuff2025'     # Alterado
+# Watchlist 21
 
 # Codificar o par username:password em base64 para a autenticação básica
 credentials = f'{username}:{password}'
@@ -46,9 +53,10 @@ auth_url = 'http://10.69.7.31/auth/login/'
 # Corpo da requisição (dados do dispositivo)
 auth_data = {
     "video_auth_token": "A",  # Substitua com o token de autenticação de vídeo, se necessário
-    "uuid": "1D9D84D5-E18C-1407-4F77-8F29EF7F5A07",  # Substitua pelo UUID real do seu dispositivo
+    "uuid": "1D9D84D5-E18C-1407-4F77-8F29EF7F5A07",  # Alterado
     "mobile": False,          # Se for um dispositivo móvel ou não
     "device_info": {}         # Informações adicionais sobre o dispositivo (se necessário)
+    #Quais informações exatamente?
 }
 
 # Cabeçalhos da requisição com a autenticação básica
@@ -68,49 +76,53 @@ if response.status_code == 200:
     if token:
         print(f'Token de autenticação obtido: Token {token}')
     else:
-        print('Token não encontrado na resposta.')
+        print('Token não encontrado na resposta. ❌')
 else:
     print(f'Falha ao obter o token: {response.status_code}')
     print(response.text)
 
-url_cards = 'http://10.69.7.31/cards/humans/'
+url_cards = 'http://10.69.7.31/cards/humans/' 
 
 # Selecionar as linhas com Status = "new"
-cursor.execute("SELECT * FROM desaparecidos WHERE observacao = 'new'")  #adaptar para o db
+#Só envia se o status for new
+cursor.execute("SELECT * FROM desaparecidos WHERE status = 'new'")  
 linhas = cursor.fetchall()
+
 def tratar_null(valor):
   return unidecode(valor) if valor is not None else ""
 
+#Verificar se há novos registros
+if not linhas:
+  print(f"[{datetime.now().strftime('%H:%M:%S')}]❌ Nenhum registro novo encontrado para processamento." )
+else:
+  print(f"Encontrado(s): {len(linhas)} registro(s) para processar.")
+
 # Verificar e processar as linhas
 for linha in linhas:
-  # Supondo que as colunas estão na ordem: CPF, BNMP, Nome, Filiacao1, Filiacao2, DN, Natural de:, RG:, Sexo, Tipificação Penal:, Status
-  #id = linha[0]
-  #O que é BNMP?
-  cpf = tratar_null(linha[5])
-  nome = tratar_null(linha[1])
-  filiacao1 = tratar_null(linha[4])
-  filiacao2 = tratar_null(linha[3])
-  dn = tratar_null(linha[2])
-  dn_transf = converter_data(dn)
-  natural_de = tratar_null(linha[12])
-  rg_raw = tratar_null(linha[6])
-  rg = rg_raw.replace('*','')
-  img_path = linha[8]
-  nif = linha[0]
-  #sexo = tratar_null(linha[14])
-  #sexo_value = sexo.replace('Masculino','M').replace('Feminino','F')
-  #tipificacao_penal = tratar_null(linha[15])
+  #Usando os nomes das colunas
+  id_db = linha['id']
+  nome = tratar_null(linha['nome'])
+  idade = tratar_null(linha['idade'])
+  sexo = tratar_null(linha['sexo'])
+  sexo_value = sexo.replace('Masculino','M').replace('Feminino','F')
+  img_path = linha['img_path']
+  uf = tratar_null(linha['estado'])
+  comment = tratar_null(linha['fonte'])
+  natural_de = tratar_null(linha['local'])
+  
+  #Verificar se há novos registros
 
   data = {
     'active':True,
-    'name': nome,  # Substitua pelo nome que você deseja pesquisa
-    'watch_lists': [9],
+    'name': nome,  # Substitua pelo nome que você deseja pesquisar
+    'watch_lists': [22],
     'meta':{
-      'cpf':cpf,
-      'mae':filiacao1,
-      'pai':filiacao2,
-      'documento': rg,
-      'data_nascimento':dn_transf,
+      'nome':nome,
+      'sexo':sexo_value,
+      'img_path': img_path,
+      'uf': uf,#Verificar se vai salvar corretamente no campo de estado.
+      'comment': comment,
+      'natural_de': tratar_null(linha['local'])
       
     }
   }
@@ -126,17 +138,15 @@ for linha in linhas:
     data_r = response.json()
     #print (data_r)
     # Obter o valor do 'id'
-    #Provavelmente não se aplica p/ os IDS do CNPD
     id_value = data_r['id']
     created_date = data_r['created_date']
 
     #Inserir a foto
     #img_path = rf"C:\mitra\RO\images\{}"
-    #Pega a imagem desse diretório e manda pro FF?
     if os.path.exists(img_path):
       print(f'o arquivo {img_path} existe') 
 
-      url_detect = 'http://10.69.7.31/detect' #url do FindFace
+      url_detect = 'http://10.69.7.31/detect'
 
       payload={
         'face':{
@@ -190,13 +200,13 @@ for linha in linhas:
 
     
     # Alterar o Status para "OK" após processamento
-    cursor.execute("UPDATE pessoas SET observacao = 'OK' WHERE nif = ?", (nif,))  #mudar para o status desejado
-    print(rf"{nome} Inserido com sucesso no FindFace 10.69.7.31")
+    cursor.execute("UPDATE desaparecidos SET status = 'OK' WHERE id = ?", (id_db,))  #mudar para o status desejado
+    print(rf"{nome} Inserido com sucesso no FindFace 10.69.7.31 ✅")
     conn.commit()
 
   else:
     print(f'Falha na requisição para /cards/humans/: {response.status_code}')
     print(f'{response}')
-  
+
 sleep(2)
-conn.close
+conn.close()
