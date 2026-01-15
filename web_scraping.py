@@ -8,38 +8,73 @@ from urllib.parse import urljoin
 import logging
 import base64
 import urllib3
-import zipfile 
+import zipfile
 import sys
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager #GErenciador de Drivers
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium_stealth import stealth 
-
+from selenium_stealth import stealth
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.core.os_manager import OperationSystemManager
+from webdriver_manager.core.http import HttpClient
 
 # Desativa os warnings de SSL (verify=False)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-# (Adiciona o path para corrigir a importação)
+#Identifica que o arquivo está na raiz do projero.
 BASE_DIR_SCRAPER = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR_SCRAPER)
-
+#Garante que o python consiga 'ver' a pasta app
+if BASE_DIR_SCRAPER not in sys.path:
+    sys.path.insert(0, BASE_DIR_SCRAPER)
+#Importa configurações from database
 try:
-    from app.models.database import DB_NAME, PROXIES, IMG_DIR
-    print(f" Configurações importadas de database.py (IMG_DIR: {IMG_DIR}) ---")
-except ImportError:
-    print("Erro: Não foi possível importar 'app.models.database'.")
-    DB_NAME = "desaparecidos.db"
+    from app.models.database import DB_PATH, PROXIES, IMG_DIR
+    DB_NAME = DB_PATH
+    print(f"✅ Configurações importadas com sucesso!")
+    print(f"Banco de dados: {DB_NAME}")
+except ImportError as e:
+    print(f"Erro de importação: {e}")
+    print("--- Usando configurações de feedback forçadas ---")
+    #Informando manualmente o caminho para o arquivo do banco de dados. 
+    DB_NAME = os.path.join(BASE_DIR_SCRAPER, "desaparecidos.db")
     PROXIES = {
         "http": 'http://atalaia:proj0Talaia992025@proxy.dpf.gov.br:8080',
-        "https": 'http://atalaia:proj0Talaia992025@proxy.dpf.gov.br:8080'
+        "https": 'https://atalaia:proj0Talaia992025@proxy.dpf.gov.br:8080'
     }
     IMG_DIR = os.path.join(BASE_DIR_SCRAPER, "source")
-    print(f"--- Usando IMG_DIR de fallback: {IMG_DIR} ---")
+# Criamos uma classe simples para forçar o download sem verificar SSL
+class WDMHttpClient(HttpClient):
+    def get(self, url, params=None, **kwargs):
+        # Adicionamos verify=False aqui para ignorar o erro de certificado
+        return requests.get(url, params, verify=False, proxies=PROXIES, **kwargs)
+
+# Configuração de variáveis de ambiente para o sistema
+os.environ['WDM_SSL_VERIFY'] = '0' # Comando específico do WebDriver Manager
+os.environ['HTTP_PROXY'] = PROXIES['http']
+os.environ['HTTPS_PROXY'] = PROXIES['https']
+
+print(f"✔️ Tentando baixar ChromeDriver com bypass SSL...")
+
+try:
+    # Passamos o nosso HttpClient customizado para o manager
+    driver_path = ChromeDriverManager().install()
+    
+    print(f"✅ ChromeDriver localizado e iniciado com sucesso!")
+except Exception as e:
+    print(f"❌ Erro ao instalar driver: {e}")
+finally:
+    # Limpa as variáveis de ambiente para não afetar outras partes do sistema
+    if 'HTTP_PROXY' in os.environ: del os.environ['HTTP_PROXY']
+    if 'HTTPS_PROXY' in os.environ: del os.environ['HTTPS_PROXY']
+
+print(f"ChromeDriver localizado com sucesso!")
 
 os.makedirs(IMG_DIR, exist_ok=True) 
 
@@ -101,36 +136,36 @@ def scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate: bool):
             cards_processados_pagina += 1 # <-- Conta este card
 
             card_text = card.get_text().lower()
-            # Default status for new records
-            status = "desaparecido"
+            # Definindo situação para casos de localizado e falecido;
+            situacao = "desaparecido" #Sitação definida como desaparecido
             if "localizada" in card_text or "localizado" in card_text:
-                status = "localizado"
+                situacao = "localizado" 
             elif "falecida" in card_text or "falecido" in card_text:
-                status = "falecido"
+                situacao = "falecido"
 
             foto_tag = card.find("img", class_="pessoa-img")
             foto_url = urljoin("https://desaparecidosbrasil.org/", foto_tag['src']) if foto_tag and foto_tag.get('src') else None
 
-            cursor.execute("SELECT id, img_path, status FROM desaparecidos WHERE foto_url = ?", (foto_url,))
+            cursor.execute("SELECT id, img_path, situacao FROM desaparecidos WHERE foto_url = ?", (foto_url,))
             registro_existente = cursor.fetchone()
 
             if registro_existente:
                 registro_id = registro_existente['id'] if hasattr(registro_existente, 'keys') else registro_existente[0]
                 img_path = registro_existente['img_path'] if hasattr(registro_existente, 'keys') else registro_existente[1]
-                existing_status = registro_existente['status'] if hasattr(registro_existente, 'keys') else (registro_existente[2] if len(registro_existente) > 2 else None)
+                existing_situacao = registro_existente['situacao'] if hasattr(registro_existente, 'keys') else (registro_existente[2] if len(registro_existente) > 2 else None)
 
-                # If status should be updated (e.g., localized or deceased), update the DB
-                if status in ("localizado", "falecido") and existing_status != status:
-                    cursor.execute("UPDATE desaparecidos SET status = ? WHERE id = ?", (status, registro_id))
+                # Atualização no banco de dados para o caso da situação responder a conficional
+                if situacao in ("localizado", "falecido") and existing_situacao != situacao:
+                    cursor.execute("UPDATE desaparecidos SET situacao = ? WHERE id = ?", (situacao, registro_id))
                     conn.commit()
-                    logging.info(f"🔄 Registro {registro_id} ('{card.find('h4').get_text(strip=True) if card.find('h4') else registro_id}') atualizado para status '{status}'.")
+                    logging.info(f"🔄 Registro {registro_id} ('{card.find('h4').get_text(strip=True) if card.find('h4') else registro_id}') atualizado para status '{situacao}'.")
 
                 # Ensure image exists on disk
                 if not img_path or not os.path.exists(img_path):
                     logging.warning(f"⚠️ Registro {registro_id} existe no DB, mas imagem falta no disco. Baixando...")
                     baixar_imagem(conn, cursor, foto_url, registro_id)
 
-                if stop_on_duplicate and status not in ("localizado", "falecido"):
+                if stop_on_duplicate and situacao not in ("localizado", "falecido"):
                     # Existing record found and incremental mode requested -> stop
                     print(f"⚠️ Foto já existe no banco ({foto_url}). Encerrando varredura incremental.")
                     return True
@@ -158,9 +193,9 @@ def scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate: bool):
             
             # (Assume que database.py (V43) foi aplicado)
             cursor.execute("""
-            INSERT INTO desaparecidos (nome, idade, sexo, desapareceu_em, local, vestimenta, instituicao, estado, foto_url, pagina, status, fonte)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (nome, idade, sexo, desapareceu_em, local, vestimenta, instituicao, estado, foto_url, page, status, "desaparecidosbrasil.org"))
+            INSERT INTO desaparecidos (nome, idade, sexo, desapareceu_em, local, vestimenta, instituicao, estado, foto_url, pagina, status, fonte, situacao)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
+            """, (nome, idade, sexo, desapareceu_em, local, vestimenta, instituicao, estado, foto_url, page, "new", "desaparecidosbrasil.org", situacao))
             conn.commit()
             registro_id = cursor.lastrowid
             baixar_imagem(conn, cursor, foto_url, registro_id)
@@ -180,141 +215,127 @@ def scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate: bool):
         time.sleep(0.3)
     return False
 #Fim da função desaparecidos do Brasil
+#JavaScript para extração dos dados em CNPD
 JS_SCRAPER_SCRIPT = """
     var cards = document.querySelectorAll('.pessoa-card');
     var data = [];
     
-    for (var i = 0; i < cards.length; i++) {
-        var card = cards[i];
-        
-        var nomeEl = card.querySelector('.pessoa-info h3');
-        var imgEl = card.querySelector('.pessoa-foto');
-        var pEls = card.querySelectorAll('.pessoa-info p'); // Procura por <p> DENTRO de .pessoa-info
-        
-        
-        var nome = nomeEl ? nomeEl.innerText : null;
-        var base64_src = imgEl ? imgEl.getAttribute('src') : null;
-        var estado = null;
-        
-        // --- Adicionar campos faltantes ---
-        var idade = null;
-        var sexo = null;
-        var desapareceu_em = null;
-        var local = null;
-        // --- FIM DA ADIÇÃO ---
+    cards.forEach(card => {
+        var info = card.querySelector('.pessoa-info');
+        if (!info) return;
 
-        // ---  Loop em <p> ---
-        if (pEls) {
-            for (var j = 0; j < pEls.length; j++) {
-                var textoP = pEls[j].innerText;
-                if (textoP.includes('Idade atual:')) {
-                    try { idade = textoP.split(':')[1].trim(); } catch (e) {}
-                } else if (textoP.includes('Sexo:')) {
-                    try { sexo = textoP.split(':')[1].trim(); } catch (e) {}
-                } else if (textoP.includes('Data de registro do desaparecimento:')) {
-                    try { desapareceu_em = textoP.split(':')[1].trim(); } catch (e) {}
-                } else if (textoP.includes('Local de registro:')) {
-                    try {
-                        var localCompleto = textoP.split(':')[1].trim();
-                        local = localCompleto.split('/')[0]; // Get "Maceió"
-                        estado = localCompleto.split('/')[1]; // Get "AL"
-                    } catch (e) { }
-                }
-            }
-        }
-        // --- FIM DA CORREÇÃO ---
+        var nome = info.querySelector('h3') ? info.querySelector('h3').innerText.trim() : null;
+        var imgEl = card.querySelector('.pessoa-foto');
+        var base64_src = imgEl ? imgEl.getAttribute('src') : null;
         
+        // Extração robusta: Pegamos todos os <p> e filtramos pelo conteúdo
+        var paragrafos = Array.from(info.querySelectorAll('p')).map(p => p.innerText);
+        
+        // Função auxiliar para encontrar o valor após o rótulo
+        function buscarValor(lista, termo) {
+            let linha = lista.find(t => t.toLowerCase().includes(termo.toLowerCase()));
+            return linha ? linha.split(':')[1].trim() : "Não informado";
+        }
+
         data.push({
-            "nome": nome, 
-            "estado": estado, 
+            "nome": nome,
             "base64_src": base64_src,
-            "idade": idade,
-            "sexo": sexo,
-            "desapareceu_em": desapareceu_em,
-            "local": local
+            "idade": buscarValor(paragrafos, 'idade'),
+            "sexo": buscarValor(paragrafos, 'sexo'), // Busca "Sexo" ou "Sexo/Gênero"
+            "desapareceu_em": buscarValor(paragrafos, 'data'),
+            "local": buscarValor(paragrafos, 'local')
         });
-    }
-    
+    });
     return data;
 """
 
+# Scraping_CNPD
 def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
     print("\n--- 🕵️ Iniciando scraping de cnpd.mj.gov.br ---")
 
-    plugin_file = 'proxy_auth_plugin.zip'
+    # Definimos o caminho COMPLETO para onde o zip DEVE ser criado
+    plugin_file = os.path.join(BASE_DIR_SCRAPER, 'proxy_auth_plugin.zip')
+    manifest_path = os.path.join(BASE_DIR_SCRAPER, 'manifest.json')
+    background_path = os.path.join(BASE_DIR_SCRAPER, 'background.js')
     
+    # 1. Criação do Plugin de Proxy
     try:
+        # Usamos o caminho absoluto plugin_file para garantir que ele seja criado na pasta certa
         with zipfile.ZipFile(plugin_file, 'w') as zp:
-            zp.write('manifest.json')
-            zp.write('background.js')
+            zp.write(manifest_path, 'manifest.json')
+            zp.write(background_path, 'background.js')
+        print(f"✅ Plugin de proxy criado com sucesso em: {plugin_file}")
     except FileNotFoundError as e:
-        logging.error(f"❌ Erro ao criar plugin: Arquivo '{e.filename}' não encontrado.")
+        logging.error(f"❌ Erro ao criar plugin: Certifique-se que manifest.json e background.js estão em {BASE_DIR_SCRAPER}")
         return
-    
-    options = Options()
-    options.add_extension(plugin_file) 
-    options.add_argument('--ignore-certificate-errors')
-    
-    # --- MODO VISÍVEL (Obrigatório para o Stealth funcionar bem) ---
-    # options.add_argument('--headless') # Desativado
-    print("---O modo Headless está DESATIVADO. O Chrome será aberto. ---")
-    
-    options.add_argument('--disable-gpu')
-    options.add_argument('--no-sandbox')
-    
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option('useAutomationExtension', False)
-    options.add_argument("--disable-blink-features=AutomationControlled")
 
+    # 2. Configuração do Driver
+    os.environ['WDM_SSL_VERIFY'] = '0'
+    os.environ['HTTP_PROXY'] = PROXIES['http']
+    os.environ['HTTPS_PROXY'] = PROXIES['https']
+    
     driver = None
-    
-    DRIVER_PATH = "chromedriver.exe" 
-    
     try:
-        print("--- Inicializando o driver do Selenium (MODO VISÍVEL)... ---")
-        s = Service(DRIVER_PATH)
-        driver = webdriver.Chrome(service=s, options=options)
+        # Instalamos o driver sem argumentos extras que causam erro
+        chrome_service = Service(ChromeDriverManager().install())
         
-        print("---  Aplicando patches 'stealth' para evitar detecção... ---")
+        if 'HTTP_PROXY' in os.environ: del os.environ['HTTP_PROXY']
+        if 'HTTPS_PROXY' in os.environ: del os.environ['HTTPS_PROXY']
+
+        options = Options()
+        # AGORA o Selenium vai encontrar o arquivo porque o caminho é absoluto
+        options.add_extension(plugin_file) 
+        
+        options.add_argument('--ignore-certificate-errors')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--no-sandbox')
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option('useAutomationExtension', False)
+        options.add_argument("--disable-blink-features=AutomationControlled")
+
+        driver = webdriver.Chrome(service=chrome_service, options=options)
+        
+        print("--- Aplicando patches 'stealth' para evitar detecção... ---")
         stealth(driver,
                 languages=["pt-BR", "pt"],
                 vendor="Google Inc.",
                 platform="Win32",
                 webgl_vendor="Intel Inc.",
                 renderer="Intel Iris OpenGL Engine",
-                fix_hairline=True,
-                )
+                fix_hairline=True)
 
         PAGE_URL = "https://cnpd.mj.gov.br/painel-publico"
         print(f"--- Acessando a página principal ({PAGE_URL})... ---")
         driver.get(PAGE_URL) 
         
+        # 3. Espera pelo carregamento inicial
         try:
             print("--- Esperando até 15s pelo primeiro card... ---")
             WebDriverWait(driver, 15).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, ".pessoa-card"))
             )
-            print("---  Página principal carregada e cards detectados. ---")
+            print("--- Página principal carregada e cards detectados. ---")
         except TimeoutException:
-            logging.error("❌ Timeout: A página carregou, mas nenhum card '.pessoa-card' foi encontrado após 15s.")
-            logging.error("O bloqueio anti-bot ainda está ativo.")
+            logging.error("❌ Timeout: Cards não encontrados. O bloqueio anti-bot pode estar ativo.")
             return
 
         pagina_atual = 1
         
+        # 4. Loop de Scraping
         while True:
-            print(f"---  Processando página {pagina_atual}... ---")
+            # Logo após o clique no botão 'Próxima' ou no início do loop da página:
+            print(f"--- Aguardando renderização completa da página {pagina_atual}... ---")
+            time.sleep(5)  # Aumente de 2 para 5 segundos para garantir que o texto do <p> apareça
+            page_data = driver.execute_script(JS_SCRAPER_SCRIPT)
             
-            print(f"---  Rolando a página {pagina_atual} para carregar imagens... ---")
+            # Rolagem para carregar imagens Lazy Load
             last_height = driver.execute_script("return document.body.scrollHeight")
             for _ in range(5): 
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 time.sleep(1) 
                 new_height = driver.execute_script("return document.body.scrollHeight")
-                if new_height == last_height:
-                    break
+                if new_height == last_height: break
                 last_height = new_height
-            print(f"--- Rolagem concluída. Lendo cards... ---")
 
             page_data = driver.execute_script(JS_SCRAPER_SCRIPT) 
 
@@ -322,133 +343,129 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
                 logging.error("❌ Nenhum card encontrado na primeira página.")
                 break
 
-            print(f"✅ CNPD (JS) encontrou {len(page_data)} registros na página {pagina_atual}.")
+            print(f"✅ CNPD encontrou {len(page_data)} registros na página {pagina_atual}.")
             
             novos_registros_encontrados_pagina = 0
+                
 
-            for card_data in tqdm(page_data, desc=f"Processando Página {pagina_atual}", unit="registro"):
+            for card_data in tqdm(page_data, desc=f"Página {pagina_atual}", unit="reg"):
                 try:
-                    cnpd_id_hash = None       
                     nome = card_data.get('nome')
-                    estado = card_data.get('estado')
-                    foto_data_base64 = card_data.get('base64_src')
                     idade = card_data.get('idade')
-                    sexo = card_data.get('sexo')
-                    desapareceu_em = card_data.get('desapareceu_em')
-                    local = card_data.get('local')
+                    sexo = card_data.get('sexo') or "Não informado"
+                    desapareceu_em = card_data.get('desapareceu_em') or "Não informado"
+                    foto_data_base64 = card_data.get('base64_src')
                     
+                    # Tratamento do Local: Divide "Manaus/AM" em cidade e estado
+                    local_raw = card_data.get('local') or ""
+                    cidade = "Não informado"
+                    estado = "Não informado"
+                    
+                    if "/" in local_raw:
+                        partes = local_raw.split("/")
+                        cidade = partes[0].strip()
+                        estado = partes[1].strip()
+                    elif local_raw:
+                        cidade = local_raw.strip()
 
-                    if not nome:
-                        logging.warning(f"⚠️ Nome não encontrado. Pulando...")
-                        continue
-                    # Adicionando verificação para evitar contagens repetidas dos desaparecidos.
-                    # Alterando a verificação de duplicadas
-                    nome = card_data.get('nome')
-                    estado = card_data.get('estado')
-                    foto_data_base64 = card_data.get('base64_src')
-                    idade = card_data.get('idade')
-                    sexo = card_data.get('sexo')
-                    desapareceu_em = card_data.get('desapareceu_em') # or 'data do desaparecimento'
-                    local = card_data.get('local')
+                    if not nome: continue
 
-                    if not nome:
-                        logging.warning(f"⚠️ Nome não encontrado. Possível falha no seletor JS. Pulando")
-                        continue
-                    # Verificação de desaparecido duplicado: Nome, Idade e Local
+                    # Verificação de Duplicata (Nome, Idade, Cidade)
                     cursor.execute("""
-                        SELECT id FROM desaparecidos WHERE NOME = ? AND idade = ? AND local = ? AND fonte = 'cnpd.mj.gov.br'
-                                   """, (nome, idade, local))
+                        SELECT id FROM desaparecidos 
+                        WHERE nome = ? AND idade = ? AND local = ? AND fonte = 'cnpd.mj.gov.br'
+                    """, (nome, idade, cidade))
+                    
                     if cursor.fetchone():
                         if stop_on_duplicate:
                             novos_registros_encontrados_pagina = -1
                             break
                         continue
-                    #Caso não seja duplicada, continua a processar...
-                
+
                     if not (foto_data_base64 and foto_data_base64.startswith("data:image")):
-                        logging.warning(f"⚠️ Imagem não era base64 '{nome}' (provavelmente falha no lazy-load). Pulando.")
                         continue
                         
-                    cnpd_id_hash = str(hash(foto_data_base64))
-
-                    # (Verifica duplicata usando cnpd_id)
-                    cursor.execute("SELECT id FROM desaparecidos WHERE cnpd_id = ? AND fonte = 'cnpd.mj.gov.br'", (cnpd_id_hash,))
+                    # Importante para o TCC: Use hashlib para consistência do ID
+                    import hashlib
+                    cnpd_id_hash = hashlib.md5(foto_data_base64.encode()).hexdigest()
                     
-                    if cursor.fetchone():
-                        if stop_on_duplicate:
-                            novos_registros_encontrados_pagina = -1 
-                            break 
-                        continue 
+                    # Salva Imagem
+                    img_path = os.path.join(IMG_DIR, f"{cnpd_id_hash}.jpg")
+                    if not os.path.exists(img_path):
+                        _, encoded_data = foto_data_base64.split(",", 1)
+                        with open(img_path, "wb") as f:
+                            f.write(base64.b64decode(encoded_data))
 
-                    novos_registros_encontrados_pagina += 1
-                    
-                    img_path = None 
-                    foto_url_para_db = f"cnpd_hash_{cnpd_id_hash}"
-
-                    img_path_teste = os.path.join(IMG_DIR, f"{cnpd_id_hash}.jpg")
-                    if os.path.exists(img_path_teste):
-                        img_path = img_path_teste
-                    else:
-                        try:
-                            img_path = os.path.join(IMG_DIR, f"{cnpd_id_hash}.jpg")
-                            _, encoded_data = foto_data_base64.split(",", 1)
-                            
-                            with open(img_path, "wb") as f:
-                                f.write(base64.b64decode(encoded_data))
-                        
-                        except Exception as e_img:
-                            logging.error(f"❌ Erro ao salvar imagem para ID {cnpd_id_hash}: {e_img}")
-                    
-                    #Iserindo dados de desaparecidos
+                    # Inserção Final
                     cursor.execute("""
-                        INSERT INTO desaparecidos
-                        (cnpd_id, nome, idade, sexo, desapareceu_em, local, instituicao, estado, foto_url, img_path, pagina, status, fonte)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cnpd.mj.gov.br')
+                        INSERT OR IGNORE INTO desaparecidos (
+                            cnpd_id, nome, idade, sexo, desapareceu_em, 
+                            local, estado, foto_url, img_path, pagina, 
+                            status, fonte, situacao
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
-                        cnpd_id_hash, nome, idade, sexo, desapareceu_em, local, 
-                        None, 
-                        estado, foto_url_para_db, img_path, pagina_atual, 'new' #Status de novo para controlhe de quando for inserir no findr face.
+                        cnpd_id_hash, nome, idade, sexo, desapareceu_em, 
+                        cidade, estado, f"cnpd_hash_{cnpd_id_hash}", 
+                        img_path, pagina_atual, 'new', 'cnpd.mj.gov.br', 'desaparecido'
                     ))
-                    
-                    conn.commit()
-                except Exception as e:
-                    logging.error(f"❌ Erro ao processar registro (JS Data): {e}")
 
-            #Tratamento para evitar duplicações no banco de dados
-            if (stop_on_duplicate and novos_registros_encontrados_pagina <= 0):
-                if (novos_registros_encontrados_pagina == -1): 
-                    print(f"--- Registro duplicado encontrado. Encerrando... ---")
-                else: 
-                    print(f"--- Nenhum registro novo encontrado na página {pagina_atual}. Encerrando... ---")
-                break 
+                    if conn.total_changes > 0:
+                        conn.commit()
+                        novos_registros_encontrados_pagina += 1
+
+                except Exception as e:
+                    logging.error(f"❌ Erro no registro {card_data.get('nome')}: {e}")
+                    
+# --- LÓGICA DE NAVEGAÇÃO COM ESPERA EXTENDIDA ---
+            if novos_registros_encontrados_pagina <= 0:
+                print(f"--- 🛑 Fim dos novos registros na página {pagina_atual}. ---")
+                break
                 
             try:
                 next_button = driver.find_element(By.CSS_SELECTOR, 'button[aria-label="Próxima página"]')
                 
-                if next_button.get_attribute("disabled"):
-                    print("--- Chegou na última página (botão desabilitado). Encerrando. ---")
+                btn_class = next_button.get_attribute("class") or ""
+                btn_disabled = next_button.get_attribute("disabled")
+                
+                if btn_disabled or "disabled" in btn_class:
+                    print("--- 🏁 Última página atingida (Botão desabilitado). ---")
                     break 
                 else:
+                    # Captura o texto do primeiro card ANTES de clicar (para comparar)
+                    primeiro_nome_antes = page_data[0].get('nome') if page_data else ""
+                    
+                    # Clica no botão de próxima
                     driver.execute_script("arguments[0].click();", next_button)
-                    pagina_atual += 1
-                    try:
-                        print(f"--- Página {pagina_atual} carregando (esperando 10s)... ---")
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, ".pessoa-card"))
-                        )
-                        print(f"--- Página {pagina_atual} carregada. ---")
-                    except TimeoutException:
-                        logging.error(f"❌ Timeout: A página {pagina_atual} carregou, mas nenhum card foi encontrado.")
+                    print(f"-- 🔄 Clique efetuado. Aguardando carregamento da página {pagina_atual + 1}... --")
+                    
+                    # ESPERA INTELIGENTE: Tentará por até 20 segundos (40 iterações de 0.5s)
+                    sucesso_mudanca = False
+                    for i in range(40): 
+                        time.sleep(0.5)
+                        # Executa o script JS para ver o que está na tela agora
+                        novos_cards = driver.execute_script(JS_SCRAPER_SCRIPT)
+                        
+                        if novos_cards and len(novos_cards) > 0:
+                            primeiro_nome_agora = novos_cards[0].get('nome')
+                            
+                            # Se o nome mudou, a página finalmente carregou!
+                            if primeiro_nome_agora != primeiro_nome_antes:
+                                print(f"✅ Página {pagina_atual + 1} carregada com sucesso (após {i/2}s).")
+                                sucesso_mudanca = True
+                                break
+                    
+                    if not sucesso_mudanca:
+                        print(f"--- ⚠️ Timeout: A página {pagina_atual + 1} demorou mais de 20s para mudar. ---")
                         break
-            
-            except NoSuchElementException:
-                print("--- Botão 'próxima' não encontrado. Encerrando. ---")
-                break 
+                    
+                    pagina_atual += 1
 
+            except (NoSuchElementException, TimeoutException) as e:
+                print(f"--- ❌ Falha na navegação: {e}")
+                break
     except Exception as e:
-        logging.error(f"❌ Falha geral ao usar Selenium web driver: {e}")
-        logging.error("Verifique se o Chrome está instalado e se o proxy está correto.")
-
+        logging.error(f"❌ Falha geral no Selenium: {e}")
     finally:
         if driver:
             driver.quit() 
@@ -457,7 +474,9 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
             os.remove(plugin_file) 
 
     print("✅ Scraping CNPD finalizado.")
-#Consulta para saber se há algum estado com o nome irregular (Nesse caso o card não vai para o BD.)
+
+
+
 def consulta_nao_especificados(cursor):
     """Executa a consulta de diagnósticos."""
     cursor.execute("SELECT fonte, COUNT(*) as quantidade FROM desaparecidos WHERE estado IS NULL OR estado = '' GROUP BY fonte; ")
@@ -482,7 +501,7 @@ def main():
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM desaparecidos")
     total = cursor.fetchone()[0]
-    stop_on_duplicate = False
+    stop_on_duplicate = True
     
 
     print(f"📊 Registros atuais no banco: {total}")
@@ -490,7 +509,6 @@ def main():
         print("🔎 Modo incremental (parar ao encontrar duplicata).")
     else:
         print("🆕 Modo completo (varrendo todas as páginas).")
-    stop_on_duplicate = False
     scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate) 
     scrape_cnpd(conn, cursor, stop_on_duplicate) 
     

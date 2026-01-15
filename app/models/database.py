@@ -147,14 +147,16 @@ def get_dados_mapa(query_corrigida,conn):
     """
     try:
         # Usa concatenação (||) para simular DISTINCT em múltiplas colunas
+        # Modifique a query SQL dentro do try:
         query_corrigida = """
             SELECT 
                 estado, 
                 COUNT(DISTINCT nome || IFNULL(idade,'') || IFNULL(local,'')) as quantidade 
             FROM desaparecidos 
+            WHERE situacao = 'desaparecido' OR situacao IS NULL
             GROUP BY estado
         """
-        
+                
         df = pd.read_sql_query(query_corrigida, conn)
         
         if "estado" not in df.columns:
@@ -194,13 +196,14 @@ def mostrar_estatisticas_por_estado(cursor):
     
     # Consulta via query para retornar apenas resultados não duplicados
     query = """
-        SELECT 
-            estado, 
-            COUNT(DISTINCT nome || IFNULL(idade,'') || IFNULL(local,'')) as qtd
-        FROM desaparecidos 
-        GROUP BY estado 
-        ORDER BY qtd DESC
-    """
+            SELECT 
+                estado, 
+                COUNT(DISTINCT nome || IFNULL(idade,'') || IFNULL(local,'')) as qtd
+            FROM desaparecidos 
+            WHERE situacao = 'desaparecido' OR situacao IS NULL
+            GROUP BY estado 
+            ORDER BY qtd DESC
+        """
     
     cursor.execute(query)
     resultados = cursor.fetchall()
