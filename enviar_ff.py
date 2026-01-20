@@ -107,21 +107,28 @@ for linha in linhas:
   sexo_value = sexo.replace('Masculino','M').replace('Feminino','F')
   img_path = linha['img_path']
   uf = tratar_null(linha['estado'])
-  comment = tratar_null(linha['fonte'])
   natural_de = tratar_null(linha['local'])
+  fonte = tratar_null(linha['fonte'])
+  local = tratar_null(linha['local'])
+  desapareceu_em = tratar_null(linha['desapareceu_em'])
+  instituicao = tratar_null(linha['instituicao'])
+  comentario_completo = (
+    f"Idade: {idade} | Sexo: {sexo} | Local: {local} | "
+    f"UF: {uf} | Data Desaparecimento: {desapareceu_em} | "
+    f"Instituição: {instituicao} | Fonte: {fonte}"
+)
   
   #Verificar se há novos registros
 
   data = {
     'active':True,
     'name': nome,  # Substitua pelo nome que você deseja pesquisar
+    'comment': comentario_completo, #comment
     'watch_lists': [22],
     'meta':{
-      'nome':nome,
       'sexo':sexo_value,
       'img_path': img_path,
       'uf': uf,#Verificar se vai salvar corretamente no campo de estado.
-      'comment': comment,
       'natural_de': tratar_null(linha['local'])
       
     }

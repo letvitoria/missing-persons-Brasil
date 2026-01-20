@@ -72,7 +72,6 @@ def init_db():
             sexo TEXT,
             desapareceu_em TEXT,
             local TEXT,
-            vestimenta TEXT,
             instituicao TEXT,
             estado TEXT,
             foto_url TEXT,
@@ -190,6 +189,29 @@ def get_dados_mapa(query_corrigida,conn):
     except Exception as e:
         print(f"Erro crítico em get_dados_mapa: {e}")
         return pd.DataFrame(columns=["estado", "uf", "quantidade"])
+def apagar_registros_cnpd():
+    """
+    Apaga todos os registros da tabela `desaparecidos` que pertencem 
+    à fonte 'cnpd.mj.gov.br'. Retorna o número de registros removidos.
+    """
+    conn = connection_db()
+    cursor = conn.cursor()
+    fonte_cnpd = 'cnpd.mj.gov.br'
+    
+    try:
+        # Executa a remoção filtrando pela fonte específica
+        cursor.execute("DELETE FROM desaparecidos WHERE fonte = ?", (fonte_cnpd,))
+        removidos = cursor.rowcount
+        conn.commit()
+        
+        print(f"🗑️ Sucesso: {removidos} registros da fonte CNPD foram apagados.")
+        return removidos
+    except Exception as e:
+        print(f"❌ Erro ao apagar registros do CNPD: {e}")
+        conn.rollback()
+        return 0
+    finally:
+        conn.close()
 
 def mostrar_estatisticas_por_estado(cursor):
     print("\n--- 📊 Estatísticas por Estado ---")
@@ -247,8 +269,10 @@ def mostrar_estatisticas_por_estado(cursor):
     print(f"Total geral: {total}")
 
 if __name__ == "__main__":
+    
     print("--- EXECUTANDO SCRIPT DE BANCO DE DADOS DIRETAMENTE ---")
     init_db()
+    apagar_registros_cnpd()
     mostrar_estatisticas_por_estado(connection_db().cursor())
     
     #apagar_desaparecido_por_nome('nome_completo')
