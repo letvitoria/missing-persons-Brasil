@@ -114,136 +114,143 @@ def baixar_imagem(conn, cursor, foto_url, registro_id, headers_para_download=Non
     except Exception as e:
         logging.error(f"❌ Falha ao salvar imagem {foto_url}: {e}")
 
-# def scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate: bool):
-#     print("\n--- 🕵️ scraping desaparecidosbrasil.org (Ajustes Finais de Localidade) ---")
-#     BASE_URL = "https://desaparecidosbrasil.org/?page={}"
-#     page = 1
+def scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate: bool):
+    print("\n--- 🕵️ scraping desaparecidosbrasil.org (Ajustes Finais de Localidade) ---")
+    BASE_URL = "https://desaparecidosbrasil.org/?page={}"
+    page = 1
     
-#     # Variável para controlar duplicadas consecutivas
-#     consecutive_duplicates = 0
+    # Variável para controlar duplicadas consecutivas
+    consecutive_duplicates = 0
     
-#     while True:
-#         url = BASE_URL.format(page)
-#         print(f"--- Acessando página {page}... ---")
-#         try:
-#             r = requests.get(url, proxies=PROXIES, timeout=30, verify=False)
-#             if r.status_code != 200: break
-#         except Exception: break
+    while True:
+        url = BASE_URL.format(page)
+        print(f"--- Acessando página {page}... ---")
+        try:
+            r = requests.get(url, proxies=PROXIES, timeout=30, verify=False)
+            if r.status_code != 200: break
+        except Exception: break
 
-#         soup = BeautifulSoup(r.text, "html.parser")
-#         cards = soup.select("div.person-card")
-#         if not cards: break
+        soup = BeautifulSoup(r.text, "html.parser")
+        cards = soup.select("div.person-card")
+        if not cards: break
 
-#         novos_nesta_pagina = 0
+        novos_nesta_pagina = 0
 
-#         for card in cards:
-#             # 1. EXTRAÇÃO DA SITUAÇÃO
-#             card_text = card.get_text().lower()
-#             situacao = "desaparecido" 
-#             if "localizada" in card_text or "localizado" in card_text:
-#                 situacao = "localizado" 
-#             elif "falecida" in card_text or "falecido" in card_text:
-#                 situacao = "falecido"
+        for card in cards:
+            # 1. EXTRAÇÃO DA SITUAÇÃO
+            card_text = card.get_text().lower()
+            situacao = "desaparecido" 
+            if "localizada" in card_text or "localizado" in card_text:
+                situacao = "localizado" 
+            elif "falecida" in card_text or "falecido" in card_text:
+                situacao = "falecido"
 
-#             nome = card.find("h4").get_text(strip=True) if card.find("h4") else "Desconhecido"
+            nome = card.find("h4").get_text(strip=True) if card.find("h4") else "Desconhecido"
             
-#             foto_tag = card.find("img", class_="pessoa-img")
-#             foto_url_rel = foto_tag['src'] if foto_tag and foto_tag.get('src') else ""
-#             if 'sem-foto' in foto_url_rel.lower() or not foto_url_rel:
-#                 continue
+            foto_tag = card.find("img", class_="pessoa-img")
+            foto_url_rel = foto_tag['src'] if foto_tag and foto_tag.get('src') else ""
+            if 'sem-foto' in foto_url_rel.lower() or not foto_url_rel:
+                continue
 
-#             foto_url = urljoin("https://desaparecidosbrasil.org/", foto_url_rel)
+            foto_url = urljoin("https://desaparecidosbrasil.org/", foto_url_rel)
 
-#             # 2. VERIFICAÇÃO DE DUPLICATA COM TOLERÂNCIA
-#             cursor.execute("SELECT id FROM desaparecidos WHERE foto_url = ?", (foto_url,))
-#             if cursor.fetchone():
-#                 if stop_on_duplicate:
-#                     consecutive_duplicates += 1
-#                     print(f"⚠️ Registro repetido ({nome}). Duplicatas seguidas: {consecutive_duplicates}")
-                    
-#                     if consecutive_duplicates >= 2:
-#                         print(f"🛑 Duas duplicadas seguidas encontradas. Encerrando scraping.")
-#                         return True
-                    
-#                     # Pula para o próximo card sem encerrar o loop total ainda
-#                     continue
-#                 continue
-
-#             #Registro Novo
-#             consecutive_duplicates = 0 # Reseta o contador pois achou um registro inédito
-#             novos_nesta_pagina += 1
             
-#             foto_id_hash = hashlib.md5(foto_url.encode()).hexdigest()
-#             file_path = os.path.join(IMG_DIR, f"{foto_id_hash}.jpg")
+            cursor.execute("SELECT id FROM desaparecidos WHERE foto_url = ?", (foto_url,))
+            if cursor.fetchone():
+                if stop_on_duplicate:
+                    consecutive_duplicates += 1
+                    print(f"⚠️ Registro repetido ({nome}). Duplicadas seguidas: {consecutive_duplicates}")
+                    
+                    if consecutive_duplicates >= 2:
+                        print(f"🛑 Duas duplicadas seguidas encontradas. Encerrando scraping.")
+                        return True
+                    
+                    # Pula para o próximo card sem encerrar o loop total ainda
+                    continue
+                continue
 
-#             #Extração de UF
-#             estado_tag = card.find("div", class_="estado-bandeira-container")
-#             estado = estado_tag.img['title'] if (estado_tag and estado_tag.img) else None
+            #Registro Novo
+            consecutive_duplicates = 0 # Reseta o contador pois achou um registro inédito
+            novos_nesta_pagina += 1
+            
+            foto_id_hash = hashlib.md5(foto_url.encode()).hexdigest()
+            file_path = os.path.join(IMG_DIR, f"{foto_id_hash}.jpg")
 
-#             idade = sexo = desapareceu_em = local = instituicao = None
-#             for p in card.find_all("p"):
-#                 txt = p.get_text().lower()
-#                 val_bruto = p.get_text(" ", strip=True).split(':')[-1].strip()
+            #Extração de UF
+            estado_tag = card.find("div", class_="estado-bandeira-container")
+            estado = estado_tag.img['title'] if (estado_tag and estado_tag.img) else None
+
+            idade = sexo = desapareceu_em = local = instituicao = None
+            for p in card.find_all("p"):
+                txt = p.get_text().lower()
+                val_bruto = p.get_text(" ", strip=True).split(':')[-1].strip()
                 
-#                 if "idade" in txt: idade = val_bruto
-#                 elif "sexo" in txt: sexo = val_bruto
-#                 elif "desapareceu" in txt: desapareceu_em = val_bruto
-#                 elif "instituição" in txt: instituicao = val_bruto
-#                 elif "local" in txt and "localizado" not in txt:
-#                     local = re.split(r'[\-,/]', val_bruto)[0].strip()
+                if "idade" in txt: idade = val_bruto
+                elif "sexo" in txt: sexo = val_bruto
+                elif "desapareceu" in txt: desapareceu_em = val_bruto
+                elif "instituição" in txt: instituicao = val_bruto
+                elif "local" in txt and "localizado" not in txt:
+                    local = re.split(r'[\-,/]', val_bruto)[0].strip()
 
-#             try:
-#                 img_data = requests.get(foto_url, verify=False, proxies=PROXIES, timeout=20).content
-#                 with open(file_path, 'wb') as f:
-#                     f.write(img_data)
-#                 print(f"📸 Foto salva: {nome} ✅")
-#             except Exception as e:
-#                 print(f"❌ Erro ao baixar foto de {nome}: {e}")
-#                 continue
+            try:
+                img_data = requests.get(foto_url, verify=False, proxies=PROXIES, timeout=20).content
+                with open(file_path, 'wb') as f:
+                    f.write(img_data)
+                print(f"📸 Foto salva: {nome} ✅")
+            except Exception as e:
+                print(f"❌ Erro ao baixar foto de {nome}: {e}")
+                continue
 
-#             #Inserção no BD
-#             cursor.execute("""
-#                 INSERT INTO desaparecidos 
-#                 (cnpd_id, nome, idade, sexo, desapareceu_em, local, instituicao, estado, foto_url, img_path, pagina, status, fonte, situacao)
-#                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-#             """, (foto_id_hash, nome, idade, sexo, desapareceu_em, local, instituicao, estado, foto_url, file_path, page, "new", "desaparecidosbrasil.org", situacao))
+            #Inserção no BD
+            cursor.execute("""
+                INSERT INTO desaparecidos 
+                (cnpd_id, nome, idade, sexo, desapareceu_em, local, instituicao, estado, foto_url, img_path, pagina, status, fonte, situacao)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (foto_id_hash, nome, idade, sexo, desapareceu_em, local, instituicao, estado, foto_url, file_path, page, "new", "desaparecidosbrasil.org", situacao))
             
-#             conn.commit()
+            conn.commit()
             
-#         print(f"✅ Página {page} processada. ({novos_nesta_pagina} novos registros)")
-#         page += 1
-#         time.sleep(1)
+        print(f"✅ Página {page} processada. ({novos_nesta_pagina} novos registros)")
+        page += 1
+        time.sleep(1)
 
-#     return False
+    return False
 #Fim da função desaparecidos do Brasil
 #JavaScript para extração dos dados em CNPD
 JS_SCRAPER_SCRIPT = """
-    var card = arguments[0];
-    if (!card) return null;
-
-    let texto = card.innerText;
-
-    function matchRegex(regex) {
+    function matchRegex(texto, regex) {
         let m = texto.match(regex);
         return m ? m[1].trim() : null;
     }
 
+    let card = arguments[0];
+    if (!card) return null;
+
+    let textoCard = card.innerText;
+    let textoPagina = document.body.innerText;
+
     return {
         modal_carregado: true,
 
-        idade: matchRegex(/(\\d+\\s+anos?)/i),
+        idade: matchRegex(textoCard, /(\\d+\\s+anos?)/i),
 
-        desapareceu_em: matchRegex(/(\\d{2}\\/\\d{2}\\/\\d{4})/),
+        desapareceu_em: matchRegex(textoCard, /(\\d{2}\\/\\d{2}\\/\\d{4})/),
 
-        // Captura QUALQUER padrão Cidade/UF
-        local: matchRegex(/([A-Za-zÀ-ÿ\\s]+)\\s*\\/\\s*([A-Z]{2})/)
+        local: matchRegex(
+            textoPagina,
+            /Local do registro\\s*:\\s*([A-Za-zÀ-ÿ\\s]+\\/\\s*[A-Z]{2})/
+        ),
+
+        sexo: matchRegex(
+            textoPagina,
+            /Sexo\\/Gênero\\s*:\\s*(Masculino|Feminino)/i
+        )
     };
 """
 
-
 # Scraping_CNPD
 def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
-    print("\n--- 🕵️ Iniciando scraping de cnpd.mj.gov.br (Iteração Estável) ---")
+    print("\n--- 🕵️ Iniciando scraping de cnpd.mj.gov.br (Arrumando apenas o path da imagem) ---")
 
     # --- Preparação do plugin de proxy ---
     plugin_file = os.path.join(BASE_DIR_SCRAPER, 'proxy_auth_plugin.zip')
@@ -334,9 +341,11 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
 
                     # --- Limpeza dos dados ---
                     idade_valor = card_data.get("idade")
+                    sexo = card_data.get("sexo")
                     if idade_valor != "Não informado":
                         m = re.search(r"\d+\s+anos?", idade_valor)
                         idade_valor = m.group(0) if m else idade_valor
+                    
 
                     desapareceu_em = card_data.get("desapareceu_em")
                     if desapareceu_em != "Não informado":
@@ -353,8 +362,7 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
                             cidade = partes[0].strip()
                             estado = partes[1].strip()
 
-
-                    # --- Duplicidade ---
+                    # --- Duplicados ---
                     cursor.execute(
                         "SELECT id FROM desaparecidos WHERE nome = ? AND local = ?",
                         (nome_atual, cidade)
@@ -382,7 +390,7 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
                         cnpd_id_hash,
                         nome_atual,
                         idade_valor,
-                        None,
+                        sexo,
                         desapareceu_em,
                         cidade,
                         estado,
@@ -465,7 +473,7 @@ def main():
         print("🔎 Modo incremental (parar ao encontrar duplicata).")
     else:
         print("🆕 Modo completo (varrendo todas as páginas).")
-    #scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate) 
+    scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate) 
     scrape_cnpd(conn, cursor, stop_on_duplicate) 
     
     print("\n 🚀 Varredura de todas as fontes concluída.")

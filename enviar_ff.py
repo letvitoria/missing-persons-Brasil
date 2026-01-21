@@ -105,7 +105,7 @@ for linha in linhas:
   idade = tratar_null(linha['idade'])
   sexo = tratar_null(linha['sexo'])
   sexo_value = sexo.replace('Masculino','M').replace('Feminino','F')
-  img_path = linha['img_path']
+  img_path = linha['img_path'] or ""
   uf = tratar_null(linha['estado'])
   natural_de = tratar_null(linha['local'])
   fonte = tratar_null(linha['fonte'])
