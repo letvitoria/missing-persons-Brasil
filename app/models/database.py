@@ -280,9 +280,9 @@ def atualizar_status_desaparecidosbrasil_para_ok():
     try:
         cursor.execute("""
             UPDATE desaparecidos
-            SET status = 'OK'
+            SET status = 'new'
             WHERE fonte = 'desaparecidosbrasil.org'
-              AND status = 'new'
+              AND status = 'OK'
         """)
         atualizados = cursor.rowcount
         conn.commit()
@@ -303,8 +303,8 @@ if __name__ == "__main__":
     
     print("--- EXECUTANDO SCRIPT DE BANCO DE DADOS DIRETAMENTE ---")
     init_db()
-    apagar_registros_cnpd()
-    #atualizar_status_desaparecidosbrasil_para_ok()
+    #apagar_registros_cnpd()
+    atualizar_status_desaparecidosbrasil_para_ok()
     mostrar_estatisticas_por_estado(connection_db().cursor())
     
     #apagar_desaparecido_por_nome('nome_completo')

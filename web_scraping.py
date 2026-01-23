@@ -113,6 +113,170 @@ def baixar_imagem(conn, cursor, foto_url, registro_id, headers_para_download=Non
             logging.warning(f"⚠️ Falha ao baixar imagem {foto_url} (status {r.status_code})")
     except Exception as e:
         logging.error(f"❌ Falha ao salvar imagem {foto_url}: {e}")
+import os
+import base64
+import requests
+from urllib.parse import urljoin
+
+def _requests_session_from_selenium(driver) -> requests.Session:
+    s = requests.Session()
+    for c in driver.get_cookies():
+        s.cookies.set(c["name"], c["value"])
+    s.headers.update({
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        "Referer": "https://cnpd.mj.gov.br/painel-publico",
+    })
+    return s
+
+import time
+from urllib.parse import urljoin
+
+import time
+import re
+from urllib.parse import urljoin
+
+def _safe_first_url_from_srcset(srcset: str) -> str | None:
+    if not srcset:
+        return None
+    # srcset: "url1 1x, url2 2x"
+    parts = [p.strip() for p in srcset.split(",") if p.strip()]
+    if not parts:
+        return None
+    first = parts[0]
+    url_only = first.split(" ")[0].strip() if first else None
+    return url_only or None
+
+def _get_modal_image_url(driver, timeout: float = 15.0) -> str | None:
+    """
+    Angular modal (app-pessoa-detalhe). Tenta achar URL da foto sem depender do <img src> estar preenchido.
+    """
+    end = time.time() + timeout
+
+    while time.time() < end:
+        url = driver.execute_script(r"""
+        const root = document.querySelector('app-pessoa-detalhe');
+        if(!root) return null;
+
+        // 1) procura QUALQUER ocorrência do endpoint de foto no HTML do componente
+        const html = root.innerHTML || '';
+        const m = html.match(/\/painel-publico\/foto\/[a-f0-9]{10,}/i);
+        if(m) return m[0];
+
+        // 2) tenta o <img> específico (mesmo que src esteja vazio, pode ter ng-reflect-*)
+        const img = root.querySelector('.foto-container .foto-wrapper img');
+        if(img){
+          const cand = [
+            img.currentSrc,
+            img.src,
+            img.getAttribute('src'),
+            img.getAttribute('data-src'),
+            img.getAttribute('ng-reflect-src'),
+            img.getAttribute('srcset'),
+            img.getAttribute('ng-reflect-srcset'),
+          ].filter(Boolean).map(s => (''+s).trim()).filter(Boolean);
+
+          // tenta achar /painel-publico/foto/ dentro de qualquer candidato
+          for(const s of cand){
+            if(s.includes('/painel-publico/foto/')) return s;
+            if(s.startsWith('blob:') || s.startsWith('data:image/')) return s;
+          }
+
+          // se tiver srcset, pega o primeiro
+          const ss = img.getAttribute('srcset') || img.getAttribute('ng-reflect-srcset');
+          if(ss) return ss;
+        }
+
+        // 3) tenta background-image do wrapper
+        const wrapper = root.querySelector('.foto-container .foto-wrapper');
+        if(wrapper){
+          const st = window.getComputedStyle(wrapper);
+          const bg = st && st.backgroundImage;
+          if(bg && bg !== 'none'){
+            const mm = bg.match(/url\(["']?(.*?)["']?\)/i);
+            if(mm && mm[1]) return mm[1].trim();
+          }
+        }
+
+        return null;
+        """)
+
+        if url:
+            url = str(url).strip()
+
+            # se veio srcset, extrai primeira URL no python de forma segura
+            if "," in url and " " in url and (url.startswith("http") or url.startswith("/")):
+                maybe = _safe_first_url_from_srcset(url)
+                if maybe:
+                    url = maybe
+
+            # normaliza relativo
+            if url.startswith("/"):
+                url = urljoin("https://cnpd.mj.gov.br", url)
+
+            # se achou só o path /painel-publico/foto/...
+            if url.startswith("/painel-publico/foto/"):
+                url = urljoin("https://cnpd.mj.gov.br", url)
+
+            # valida mínimo
+            if url and url not in ("https://cnpd.mj.gov.br/", "https://cnpd.mj.gov.br"):
+                return url
+
+        time.sleep(0.25)
+
+    return None
+
+
+def _blob_to_bytes(driver, blob_url: str) -> bytes:
+    js = """
+    const blobUrl = arguments[0];
+    const done = arguments[1];
+    fetch(blobUrl).then(r => r.blob()).then(b => {
+      const fr = new FileReader();
+      fr.onloadend = () => done(fr.result);
+      fr.readAsDataURL(b);
+    }).catch(_ => done(null));
+    """
+    data_url = driver.execute_async_script(js, blob_url)
+    if not data_url or not isinstance(data_url, str) or "," not in data_url:
+        raise RuntimeError("Falha ao converter blob para dataURL")
+    b64 = data_url.split(",", 1)[1]
+    return base64.b64decode(b64)
+
+def _download_image_bytes(driver, url: str) -> tuple[bytes, str]:
+    """
+    Baixa bytes da imagem lidando com blob:, data: e http(s).
+    Retorna (bytes, ext_sugerida).
+    """
+    if url.startswith("blob:"):
+        b = _blob_to_bytes(driver, url)
+    elif url.startswith("data:image/"):
+        b64 = url.split(",", 1)[1]
+        b = base64.b64decode(b64)
+    else:
+        s = _requests_session_from_selenium(driver)
+        r = s.get(url, timeout=30, allow_redirects=True)
+        r.raise_for_status()
+        ctype = (r.headers.get("Content-Type") or "").lower()
+        if "text/html" in ctype:
+            # fallback: se veio html, tenta achar img dentro da própria página retornada (r.url)
+            # (raro aqui, mas deixa robusto)
+            raise RuntimeError(f"Resposta não foi imagem (HTML) ao baixar: {url}")
+        b = r.content
+
+    # inferir extensão mínima por assinatura
+    ext = ".jpg"
+    if b[:8] == b"\x89PNG\r\n\x1a\n":
+        ext = ".png"
+    elif b[:3] == b"GIF":
+        ext = ".gif"
+    elif b[:2] == b"\xff\xd8":
+        ext = ".jpg"
+    else:
+        ext = ".jpg"
+
+    return b, ext
+
 
 def scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate: bool):
     print("\n--- 🕵️ scraping desaparecidosbrasil.org (Ajustes Finais de Localidade) ---")
@@ -215,8 +379,8 @@ def scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate: bool):
         time.sleep(1)
 
     return False
-#Fim da função desaparecidos do Brasil
-#JavaScript para extração dos dados em CNPD
+# Fim da função desaparecidos do Brasil
+# JavaScript para extração dos dados em CNPD
 JS_SCRAPER_SCRIPT = """
     function matchRegex(texto, regex) {
         let m = texto.match(regex);
@@ -261,12 +425,12 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
     except Exception as e:
         logging.error(f"❌ Erro ao preparar proxy: {e}")
         return
+
     try:
         chrome_service = Service(ChromeDriverManager().install())
     except Exception as e:
         logging.error(f"❌ Erro ao iniciar ChromeDriver: {e}")
         return
-    
 
     options = Options()
     options.add_extension(plugin_file)
@@ -345,12 +509,12 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
                     if idade_valor != "Não informado":
                         m = re.search(r"\d+\s+anos?", idade_valor)
                         idade_valor = m.group(0) if m else idade_valor
-                    
 
                     desapareceu_em = card_data.get("desapareceu_em")
                     if desapareceu_em != "Não informado":
                         m = re.search(r"\d{2}/\d{2}/\d{4}", desapareceu_em)
                         desapareceu_em = m.group(0) if m else desapareceu_em
+
                     local_match = card_data.get("local")
 
                     cidade = "Não informado"
@@ -377,7 +541,34 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
                         f"{nome_atual}{cidade}{desapareceu_em}".encode()
                     ).hexdigest()
 
-                    img_path = os.path.join(IMG_DIR, f"{cnpd_id_hash}.jpg")
+                    # ==========================================================
+                    # ✅ CORREÇÃO: Capturar e salvar a foto REAL da pessoa no modal
+                    # (sem mexer no restante do fluxo que já funciona)
+                    # ==========================================================
+                    foto_url_real = None
+                    img_path = None
+
+                    try:
+                        # Pega a URL real (http/https/data/blob) da foto dentro do modal aberto
+                        foto_url_real = _get_modal_image_url(driver, timeout=12.0)
+
+                        if foto_url_real:
+                            # Baixa bytes e define extensão pela assinatura
+                            foto_bytes, ext = _download_image_bytes(driver, foto_url_real)
+
+                            os.makedirs(IMG_DIR, exist_ok=True)
+                            img_path = os.path.join(IMG_DIR, f"{cnpd_id_hash}{ext}")
+
+                            # Salva no disco
+                            with open(img_path, "wb") as f:
+                                f.write(foto_bytes)
+                        else:
+                            logging.warning(f"⚠️ Foto não localizada no modal para {nome_atual}")
+                    except Exception as e:
+                        logging.warning(f"⚠️ Falha ao baixar/salvar foto de {nome_atual}: {e}")
+                        foto_url_real = None
+                        img_path = None
+                    # ==========================================================
 
                     # --- Inserção no banco ---
                     cursor.execute("""
@@ -394,8 +585,8 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
                         desapareceu_em,
                         cidade,
                         estado,
-                        f"cnpd_hash_{cnpd_id_hash}",
-                        img_path,
+                        foto_url_real,   # ✅ agora é a URL real da foto (ou None)
+                        img_path,        # ✅ agora é um path de arquivo existente (ou None)
                         pagina_atual,
                         "new",
                         "cnpd.mj.gov.br",
