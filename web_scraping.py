@@ -383,16 +383,47 @@ def scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate: bool):
 # JavaScript para extração dos dados em CNPD
 JS_SCRAPER_SCRIPT = """
     function matchRegex(texto, regex) {
+        if (!texto) return null;
         let m = texto.match(regex);
         return m ? m[1].trim() : null;
+    }
+
+    function isVisible(el){
+        if(!el) return false;
+        const st = window.getComputedStyle(el);
+        if(!st) return false;
+        if(st.display === 'none' || st.visibility === 'hidden' || st.opacity === '0') return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 10 && r.height > 10;
     }
 
     let card = arguments[0];
     if (!card) return null;
 
-    let textoCard = card.innerText;
-    let textoPagina = document.body.innerText;
+    // Texto do card (idade/data continuam como antes)
+    let textoCard = card.innerText || "";
 
+    // ✅ NOVO: pegar texto SOMENTE do modal visível (evita repetir local/sexo)
+    let modalRoot = null;
+
+    // Pode existir mais de um app-pessoa-detalhe no DOM (alguns ocultos)
+    const detalhes = Array.from(document.querySelectorAll('app-pessoa-detalhe'));
+    for (const d of detalhes){
+        if (isVisible(d)) { modalRoot = d; break; }
+    }
+
+    // fallback: modal-container visível
+    if (!modalRoot) {
+        const modals = Array.from(document.querySelectorAll('.modal-container'));
+        for (const m of modals){
+            if (isVisible(m)) { modalRoot = m; break; }
+        }
+    }
+
+    // último fallback (só se não achar modal mesmo)
+    let textoModal = modalRoot ? (modalRoot.innerText || "") : (document.body.innerText || "");
+
+    // Regex do local/sexo agora roda no texto do MODAL (da pessoa atual)
     return {
         modal_carregado: true,
 
@@ -401,12 +432,12 @@ JS_SCRAPER_SCRIPT = """
         desapareceu_em: matchRegex(textoCard, /(\\d{2}\\/\\d{2}\\/\\d{4})/),
 
         local: matchRegex(
-            textoPagina,
+            textoModal,
             /Local do registro\\s*:\\s*([A-Za-zÀ-ÿ\\s]+\\/\\s*[A-Z]{2})/
         ),
 
         sexo: matchRegex(
-            textoPagina,
+            textoModal,
             /Sexo\\/Gênero\\s*:\\s*(Masculino|Feminino)/i
         )
     };
@@ -526,7 +557,7 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
                             cidade = partes[0].strip()
                             estado = partes[1].strip()
 
-                    # --- Duplicados ---
+
                     cursor.execute(
                         "SELECT id FROM desaparecidos WHERE nome = ? AND local = ?",
                         (nome_atual, cidade)
@@ -537,14 +568,11 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
                         continue
 
                     # --- ID único ---
+                     
                     cnpd_id_hash = hashlib.md5(
                         f"{nome_atual}{cidade}{desapareceu_em}".encode()
                     ).hexdigest()
 
-                    # ==========================================================
-                    # ✅ CORREÇÃO: Capturar e salvar a foto REAL da pessoa no modal
-                    # (sem mexer no restante do fluxo que já funciona)
-                    # ==========================================================
                     foto_url_real = None
                     img_path = None
 
@@ -568,9 +596,7 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
                         logging.warning(f"⚠️ Falha ao baixar/salvar foto de {nome_atual}: {e}")
                         foto_url_real = None
                         img_path = None
-                    # ==========================================================
 
-                    # --- Inserção no banco ---
                     cursor.execute("""
                         INSERT OR IGNORE INTO desaparecidos (
                             cnpd_id, nome, idade, sexo, desapareceu_em,
@@ -585,8 +611,8 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
                         desapareceu_em,
                         cidade,
                         estado,
-                        foto_url_real,   # ✅ agora é a URL real da foto (ou None)
-                        img_path,        # ✅ agora é um path de arquivo existente (ou None)
+                        foto_url_real,   
+                        img_path,       
                         pagina_atual,
                         "new",
                         "cnpd.mj.gov.br",

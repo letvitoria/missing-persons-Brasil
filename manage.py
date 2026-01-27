@@ -16,12 +16,12 @@ except ImportError as e:
     print(f"ERRO: 'web_scraping.py' não foi encontrado. {e}")
     SCRAPER_DISPONIVEL = False
 
-# Local dos scripts adicionais que devem rodar após o scraping
-#ENVIAR_FF_PATH = os.path.join(os.path.dirname(__file__), "app", "models", "enviar_ff.py")
-#INACTIVATE_CARDS_PATH = os.path.join(os.path.dirname(__file__), "app", "models", "inactivate_cards.py")
+#Local dos scripts adicionais que devem rodar após o scraping
+ENVIAR_FF_PATH = os.path.join(os.path.dirname(__file__), "app", "models", "enviar_ff.py")
+INACTIVATE_CARDS_PATH = os.path.join(os.path.dirname(__file__), "app", "models", "inactivate_cards.py")
 
-#ENVIAR_FF_DISPONIVEL = os.path.exists(ENVIAR_FF_PATH)
-#INACTIVATE_CARDS_DISPONIVEL = os.path.exists(INACTIVATE_CARDS_PATH)
+ENVIAR_FF_DISPONIVEL = os.path.exists(ENVIAR_FF_PATH)
+INACTIVATE_CARDS_DISPONIVEL = os.path.exists(INACTIVATE_CARDS_PATH)
 
 # Configuração de Log
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

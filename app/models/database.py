@@ -268,7 +268,7 @@ def mostrar_estatisticas_por_estado(cursor):
     total = cursor.fetchone()[0]
     print(f"Total geral: {total}")
 
-def atualizar_status_desaparecidosbrasil_para_ok():
+def atualizar_status_desaparecidosbrasil():
     """
     Atualiza o status para 'OK' de todos os registros
     cuja fonte seja 'desaparecidosbrasil.org' e status atual seja 'new'.
@@ -287,7 +287,7 @@ def atualizar_status_desaparecidosbrasil_para_ok():
         atualizados = cursor.rowcount
         conn.commit()
 
-        print(f"✅ Status atualizado para 'OK' em {atualizados} registros (desaparecidosbrasil.org).")
+        print(f"✅ Status atualizado para 'new' em {atualizados} registros (desaparecidosbrasil.org).")
         return atualizados
 
     except Exception as e:
@@ -304,8 +304,7 @@ if __name__ == "__main__":
     print("--- EXECUTANDO SCRIPT DE BANCO DE DADOS DIRETAMENTE ---")
     init_db()
     #apagar_registros_cnpd()
-    atualizar_status_desaparecidosbrasil_para_ok()
+    #atualizar_status_desaparecidosbrasil()
     mostrar_estatisticas_por_estado(connection_db().cursor())
-    
     #apagar_desaparecido_por_nome('nome_completo')
     print("--- SCRIPT DE BANCO DE DADOS CONCLUÍDO ---")
