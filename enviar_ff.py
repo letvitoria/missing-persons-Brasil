@@ -112,10 +112,12 @@ for linha in linhas:
   local = tratar_null(linha['local'])
   desapareceu_em = tratar_null(linha['desapareceu_em'])
   instituicao = tratar_null(linha['instituicao'])
+  situacao = tratar_null(linha['situacao'])
   comentario_completo = (
     f"Idade: {idade} | Sexo: {sexo} | Local: {local} | "
     f"UF: {uf} | Data Desaparecimento: {desapareceu_em} | "
-    f"Instituição: {instituicao} | Fonte: {fonte}"
+    f"Instituição: {instituicao} | Fonte: {fonte} | "
+    f"Situação: {situacao}" 
 )
   
   #Verificar se há novos registros
