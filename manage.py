@@ -17,8 +17,10 @@ except ImportError as e:
     SCRAPER_DISPONIVEL = False
 
 #Local dos scripts adicionais que devem rodar após o scraping
-ENVIAR_FF_PATH = os.path.join(os.path.dirname(__file__), "app", "models", "enviar_ff.py")
-INACTIVATE_CARDS_PATH = os.path.join(os.path.dirname(__file__), "app", "models", "inactivate_cards.py")
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ENVIAR_FF_PATH = os.path.join(BASE_DIR, "enviar_ff.py")
+INACTIVATE_CARDS_PATH =  os.path.join(BASE_DIR, "inactivate_cards.py")
 
 ENVIAR_FF_DISPONIVEL = os.path.exists(ENVIAR_FF_PATH)
 INACTIVATE_CARDS_DISPONIVEL = os.path.exists(INACTIVATE_CARDS_PATH)
@@ -32,31 +34,36 @@ def agendar_tarefa_scraping():
         logging.warning("[AGENDADO] Scraping ignorado (arquivo não encontrado)")
         return
     logging.info("[AGENDADO] INICIANDO SCRAPING DIÁRIO ---")
-    #try:
-    #    scraper_main()
-    #    logging.info("--- [AGENDADO] SCRAPING DIÁRIO CONCLUÍDO ---")
-        # Após atualizar o mapa (scraping), executar os scripts auxiliares, se disponíveis
-    #    try:
-    #        if ENVIAR_FF_DISPONIVEL:
-    #            logging.info("Executando script: enviar_ff.py")
-    #            runpy.run_path(ENVIAR_FF_PATH, run_name="__main__")
-    #            logging.info("Script enviar_ff.py concluído")
-    #        else:
-    #            logging.warning("Script enviar_ff.py não encontrado; pulando execução")
-    #    except Exception as e:
-    #        logging.error(f"Erro ao executar enviar_ff.py: {e}", exc_info=True)
-    #
-    #   try:
-    #       if INACTIVATE_CARDS_DISPONIVEL:
-    #            logging.info("Executando script: inactivate_cards.py")
-    #            runpy.run_path(INACTIVATE_CARDS_PATH, run_name="__main__")
-    #            logging.info("Script inactivate_cards.py concluído")
-    #        else:
-    #            logging.warning("Script inactivate_cards.py não encontrado; pulando execução")
-    #    except Exception as e:
-    #        logging.error(f"Erro ao executar inactivate_cards.py: {e}", exc_info=True)
-    #except Exception as e:
-    #    logging.error(f"[AGENDADO] ERRO AO EXECUTAR SCRAPING DIÁRIO: {e}", exc_info=True)
+    try:
+        print("XXXXXX")
+    except:
+        print("XXXXX")
+    try:
+        scraper_main()
+        logging.info("--- [AGENDADO] SCRAPING DIÁRIO CONCLUÍDO ---")
+            #Após atualizar o mapa (scraping), executar os scripts auxiliares, se disponíveis
+    #     try:
+    #         if ENVIAR_FF_DISPONIVEL:
+    #             logging.info("Executando script: enviar_ff.py")
+    #             runpy.run_path(ENVIAR_FF_PATH, run_name="__main__")
+    #             logging.info("Script enviar_ff.py concluído")
+    #         else:
+    #             logging.warning("Script enviar_ff.py não encontrado; pulando execução")
+    #     except Exception as e:
+    #         logging.error(f"Erro ao executar enviar_ff.py: {e}", exc_info=True)
+
+    #     try:
+    #         if INACTIVATE_CARDS_DISPONIVEL:
+    #             logging.info("Executando script: inactivate_cards.py")
+    #             runpy.run_path(INACTIVATE_CARDS_PATH, run_name="__main__")
+    #             logging.info("Script inactivate_cards.py concluído")
+    #         else:
+    #             logging.warning("Script inactivate_cards.py não encontrado; pulando execução")
+
+    #     except Exception as e:
+    #         logging.error(f"Erro ao executar inactivate_cards.py: {e}", exc_info=True)
+    except Exception as e:
+        logging.error(f"[AGENDADO] ERRO AO EXECUTAR SCRAPING DIÁRIO: {e}", exc_info=True)
 
 if __name__ == "__main__":
     
@@ -73,7 +80,7 @@ if __name__ == "__main__":
     logging.info("Configurando o agendador de tarefas...")
     scheduler = BackgroundScheduler(daemon=True)
     # Configurando o trigger para rodar no horário definido:
-    scheduler.add_job(agendar_tarefa_scraping, trigger='cron', hour=11, minute=40)
+    scheduler.add_job(agendar_tarefa_scraping, trigger='cron', hour=10, minute=00)
     scheduler.start()
     logging.info("Agendador iniciado. O scraping rodará diariamente às 10:00h")
     
