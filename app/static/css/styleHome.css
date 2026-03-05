@@ -7,9 +7,8 @@ body {
     overflow: hidden; 
 }
 
-/* Ajuste para exibir corretamente as estatísticas e manter o mapa ao lado */
 #stats {
-    width: 280px;      /* largura suficiente para mostrar as estatísticas */
+    width: 280px;      
     min-width: 220px;
     padding: 20px;
     overflow-y: auto;
@@ -18,15 +17,13 @@ body {
     border-right: 1px solid #ddd;
 }
 
-/* Conteiner do mapa: ocupa o restante do espaço e delimita o mapa absoluto */
 #mapa {
-    flex: 1;           /* ocupa o restante do espaço ao lado de #stats */
-    position: relative;/* torna #mapa o ancestor posicionado do filho absoluto */
+    flex: 1;           
+    position: relative;
     height: 100vh;
     overflow: hidden;
 }
 
-/* O elemento do plotly continua absoluto, mas agora fica preso dentro de #mapa */
 #mapa > div {
     position: absolute !important;
     top: 0;

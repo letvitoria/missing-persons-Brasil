@@ -32,11 +32,10 @@ except Exception as e:
 headers = {'Authorization': f'Token {token}', 'Content-Type': 'application/json'}
 
 #Buscar todos os Cards da Watchlist 
-#O FindFace permite filtrar por watch_lists na URL de busca
 url_cards = f'http://{HOST}/cards/humans/'
 params = {
     'watch_lists': WATCHLIST_ID,
-    'limit': 1000  # Ajuste o limite conforme necessário
+    'limit': 1000  #Define um limite de exclusões
 }
 
 try:
@@ -45,8 +44,6 @@ try:
         cards = response.json().get('results', [])
         total = len(cards)
         print(f"🔍 Encontrados {total} cards para exclusão.")
-        
-        #Deletar cada Card encontrado ---
         sucesso = 0
         erro = 0
         

@@ -17,13 +17,12 @@ class HomeController:
             return "Não especificado"
         
         s = str(estado_value).strip()
-        
-        # 1. Se já é sigla válida (ex: SP)
+
         maybe = s.upper()
         if len(maybe) == 2 and maybe in database.uf_estados:
             return database.uf_estados[maybe]
             
-        # 2. Tenta extrair padrão 'Nome - XX'
+        #Tenta extrair padrão 'Nome - XX'
         m = re.search(r'(.+?)\s*-\s*([A-Za-z]{2})$', s)
         if m:
             uf = m.group(2).upper()
@@ -31,14 +30,14 @@ class HomeController:
                 return database.uf_estados[uf]
             return m.group(1).strip()
             
-        # 3. Normaliza e procura no dicionário
+        #Normaliza e procura no dicionário
         nn = database.normalize(s)
         normalized_to_uf = {database.normalize(k): v for k, v in database.estados_uf.items()}
         if nn in normalized_to_uf:
             uf = normalized_to_uf[nn]
             return database.uf_estados.get(uf, s)
             
-        # 4. Último recurso: comparar com nomes completos
+        #Comparar com nomes completos
         for uf, full in database.uf_estados.items():
             if database.normalize(full) == nn:
                 return full

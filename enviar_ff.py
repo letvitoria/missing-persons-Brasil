@@ -22,8 +22,7 @@ def converter_data(data):
             mes = nums[2:4]
             ano = nums[4:]
             
-            # Retorna no padrão ISO (AAAA-MM-DD), que é o padrão internacional
-            # Se a sua API exige o padrão BR, use f"{dia}/{mes}/{ano}"
+            # Retorna no padrão ISO (AAAA-MM-DD)
             return f"{ano}-{mes}-{dia}"
         return ""
     except Exception:
@@ -42,7 +41,6 @@ cursor = conn.cursor()
 username = 'linux'  # Alterado
 password = 'ubuntuff2025'     # Alterado
 
-
 # Codificar o par username:password em base64 para a autenticação básica
 credentials = f'{username}:{password}'
 encoded_credentials = base64.b64encode(credentials.encode('utf-8')).decode('utf-8')
@@ -52,11 +50,10 @@ auth_url = 'http://10.69.7.31/auth/login/'
 
 # Corpo da requisição (dados do dispositivo)
 auth_data = {
-    "video_auth_token": "A",  # Substitua com o token de autenticação de vídeo, se necessário
+    "video_auth_token": "A",  
     "uuid": "1D9D84D5-E18C-1407-4F77-8F29EF7F5A07",  # Alterado
     "mobile": False,          # Se for um dispositivo móvel ou não
     "device_info": {}         # Informações adicionais sobre o dispositivo (se necessário)
-    #Quais informações exatamente?
 }
 
 # Cabeçalhos da requisição com a autenticação básica
@@ -119,7 +116,6 @@ for linha in linhas:
     f"Instituição: {instituicao} | Fonte: {fonte} | "
     f"Situação: {situacao}" 
 )
-  
   #Verificar se há novos registros
 
   data = {
@@ -151,7 +147,6 @@ for linha in linhas:
     created_date = data_r['created_date']
 
     #Inserir a foto
-    #img_path = rf"C:\mitra\RO\images\{}"
     if os.path.exists(img_path):
       print(f'o arquivo {img_path} existe') 
 

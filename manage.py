@@ -29,7 +29,7 @@ INACTIVATE_CARDS_DISPONIVEL = os.path.exists(INACTIVATE_CARDS_PATH)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def agendar_tarefa_scraping():
-    # Essa é chamada diariamente
+    # Chamada diariamente
     if not SCRAPER_DISPONIVEL:
         logging.warning("[AGENDADO] Scraping ignorado (arquivo não encontrado)")
         return

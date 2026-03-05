@@ -5,8 +5,7 @@ import requests
 import json
 import os
 
-# --- 1. Garantia do Caminho do Banco ---
-# Isso garante que o Python abra o banco na mesma pasta do script
+#Caminho DB
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 db_path = os.path.join(BASE_DIR, "pessoasdesaparecidas.db")
 
@@ -21,7 +20,7 @@ cursor = conn.cursor()
 def tratar_null(valor):
     return unidecode(str(valor)).strip() if valor is not None else ""
 
-# --- 2. Autenticação ---
+# Autenticação FF
 username, password = 'linux', 'ubuntuff2025'
 encoded_credentials = base64.b64encode(f'{username}:{password}'.encode('utf-8')).decode('utf-8')
 auth_url = 'http://10.69.7.31/auth/login/'
@@ -39,8 +38,8 @@ except Exception as e:
     print(f"Erro na conexão: {e}")
     exit()
 
-# --- 3. Busca no Banco com 'LIKE' (Mais potente que 'IN') ---
-# O LIKE com % contorna espaços extras ou problemas de caracteres
+
+# LIKE com % contorna espaços extras ou problemas de caracteres
 query = """
 SELECT * FROM desaparecidos 
 WHERE situacao LIKE '%localizado%' 
@@ -51,7 +50,7 @@ linhas = cursor.fetchall()
 
 print(f"DEBUG: Registros encontrados no SQLite: {len(linhas)}")
 
-# --- 4. Processamento ---
+
 url_cards = 'http://10.69.7.31/cards/humans/'
 
 for linha in linhas:

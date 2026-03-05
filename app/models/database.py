@@ -146,7 +146,6 @@ def get_dados_mapa(query_corrigida,conn):
     """
     try:
         # Usa concatenação (||) para simular DISTINCT em múltiplas colunas
-        # Modifique a query SQL dentro do try:
         query_corrigida = """
             SELECT 
                 estado, 
@@ -189,6 +188,7 @@ def get_dados_mapa(query_corrigida,conn):
     except Exception as e:
         print(f"Erro crítico em get_dados_mapa: {e}")
         return pd.DataFrame(columns=["estado", "uf", "quantidade"])
+    
 def apagar_registros_cnpd():
     """
     Apaga todos os registros da tabela `desaparecidos` que pertencem 
