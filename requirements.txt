@@ -1,0 +1,11 @@
+flask
+mvc-flask
+waitress
+apscheduler
+requests
+beautifulsoup4
+selenium
+webdriver-manager
+selenium-stealth
+tqdm
+urllib3

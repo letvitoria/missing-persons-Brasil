@@ -42,7 +42,7 @@ if BASE_DIR_SCRAPER not in sys.path:
 try:
     from app.models.database import DB_PATH, PROXIES, IMG_DIR
     DB_NAME = DB_PATH
-    print(f"✅ Configurações importadas com sucesso!")
+    print(f"[OK] Configurações importadas com sucesso!")
     print(f"Banco de dados: {DB_NAME}")
 except ImportError as e:
     print(f"Erro de importação: {e}")
@@ -66,18 +66,18 @@ os.environ['HTTP_PROXY'] = PROXIES['http']
 os.environ['HTTPS_PROXY'] = PROXIES['https']
 os.environ['no_proxy'] = 'localhost,127.0.0.1'
 
-print(f"✔️ Tentando baixar ChromeDriver com bypass SSL...")
+print(f" Tentando baixar ChromeDriver com bypass SSL...")
 
-print(f"✔️ Tentando baixar ChromeDriver com bypass SSL...")
+print(f" Tentando baixar ChromeDriver com bypass SSL...")
 
 try:
     # Criamos a instância do cliente que usa suas credenciais do DPF
     wdm_client = WDMHttpClient()
     chrome_service = Service(ChromeDriverManager(http_client=wdm_client).install())
     
-    print(f"✅ ChromeDriver localizado e iniciado com sucesso!")
+    print(f" ChromeDriver localizado e iniciado com sucesso!")
 except Exception as e:
-    print(f"❌ Erro ao instalar driver: {e}")
+    print(f" Erro ao instalar driver: {e}")
 
 print(f"ChromeDriver localizado com sucesso!")
 
@@ -108,11 +108,11 @@ def baixar_imagem(conn, cursor, foto_url, registro_id, headers_para_download=Non
                     f.write(chunk)
             cursor.execute("UPDATE desaparecidos SET img_path = ? WHERE id = ?", (file_path, registro_id))
             conn.commit()
-            logging.info(f"✅ Foto baixada (requests) com sucesso para ID {registro_id}")
+            logging.info(f" Foto baixada (requests) com sucesso para ID {registro_id}")
         else:
-            logging.warning(f"⚠️ Falha ao baixar imagem {foto_url} (status {r.status_code})")
+            logging.warning(f" Falha ao baixar imagem {foto_url} (status {r.status_code})")
     except Exception as e:
-        logging.error(f"❌ Falha ao salvar imagem {foto_url}: {e}")
+        logging.error(f" Falha ao salvar imagem {foto_url}: {e}")
 import os
 import base64
 import requests
@@ -279,7 +279,7 @@ def _download_image_bytes(driver, url: str) -> tuple[bytes, str]:
 
 
 def scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate: bool):
-    print("\n--- 🕵️ scraping desaparecidosbrasil.org (Ajustes Finais de Localidade) ---")
+    print("\n---  scraping desaparecidosbrasil.org ---")
     BASE_URL = "https://desaparecidosbrasil.org/?page={}"
     page = 1
     
@@ -323,10 +323,10 @@ def scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate: bool):
             if cursor.fetchone():
                 if stop_on_duplicate:
                     consecutive_duplicates += 1
-                    print(f"⚠️ Registro repetido ({nome}). Duplicadas seguidas: {consecutive_duplicates}")
+                    print(f" Registro repetido ({nome}). Duplicadas seguidas: {consecutive_duplicates}")
                     
                     if consecutive_duplicates >= 2:
-                        print(f"🛑 Duas duplicadas seguidas encontradas. Encerrando scraping.")
+                        print(f" Duas duplicadas seguidas encontradas. Encerrando scraping.")
                         return True
                     
                     # Pula para o próximo card sem encerrar o loop total ainda
@@ -360,9 +360,9 @@ def scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate: bool):
                 img_data = requests.get(foto_url, verify=False, proxies=PROXIES, timeout=20).content
                 with open(file_path, 'wb') as f:
                     f.write(img_data)
-                print(f"📸 Foto salva: {nome} ✅")
+                print(f" Foto salva: {nome} ")
             except Exception as e:
-                print(f"❌ Erro ao baixar foto de {nome}: {e}")
+                print(f" Erro ao baixar foto de {nome}: {e}")
                 continue
 
             #Inserção no BD
@@ -374,7 +374,7 @@ def scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate: bool):
             
             conn.commit()
             
-        print(f"✅ Página {page} processada. ({novos_nesta_pagina} novos registros)")
+        print(f" Página {page} processada. ({novos_nesta_pagina} novos registros)")
         page += 1
         time.sleep(1)
 
@@ -403,7 +403,7 @@ JS_SCRAPER_SCRIPT = """
     // Texto do card (idade/data continuam como antes)
     let textoCard = card.innerText || "";
 
-    // ✅ NOVO: pegar texto SOMENTE do modal visível (evita repetir local/sexo)
+    //  NOVO: pegar texto SOMENTE do modal visível (evita repetir local/sexo)
     let modalRoot = null;
 
     // Pode existir mais de um app-pessoa-detalhe no DOM (alguns ocultos)
@@ -445,7 +445,7 @@ JS_SCRAPER_SCRIPT = """
 
 # Scraping_CNPD
 def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
-    print("\n--- 🕵️ Iniciando scraping de cnpd.mj.gov.br (Arrumando apenas o path da imagem) ---")
+    print("\n---  Iniciando scraping de cnpd.mj.gov.br ---")
 
     # --- Preparação do plugin de proxy ---
     plugin_file = os.path.join(BASE_DIR_SCRAPER, 'proxy_auth_plugin.zip')
@@ -454,13 +454,13 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
             zp.write(os.path.join(BASE_DIR_SCRAPER, 'manifest.json'), 'manifest.json')
             zp.write(os.path.join(BASE_DIR_SCRAPER, 'background.js'), 'background.js')
     except Exception as e:
-        logging.error(f"❌ Erro ao preparar proxy: {e}")
+        logging.error(f" Erro ao preparar proxy: {e}")
         return
 
     try:
         chrome_service = Service(ChromeDriverManager().install())
     except Exception as e:
-        logging.error(f"❌ Erro ao iniciar ChromeDriver: {e}")
+        logging.error(f" Erro ao iniciar ChromeDriver: {e}")
         return
 
     options = Options()
@@ -483,7 +483,7 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
         pagina_atual = 1
 
         while True:
-            print(f"\n📄 Processando página {pagina_atual}...")
+            print(f"\n Processando página {pagina_atual}...")
             time.sleep(3)
 
             index = 0
@@ -529,7 +529,7 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
                             time.sleep(1)
 
                     if not modal_abriu or not card_data:
-                        logging.warning(f"⚠️ Falha ao carregar dados de {nome_atual}")
+                        logging.warning(f" Falha ao carregar dados de {nome_atual}")
                         webdriver.ActionChains(driver).send_keys(Keys.ESCAPE).perform()
                         index += 1
                         continue
@@ -591,9 +591,9 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
                             with open(img_path, "wb") as f:
                                 f.write(foto_bytes)
                         else:
-                            logging.warning(f"⚠️ Foto não localizada no modal para {nome_atual}")
+                            logging.warning(f" Foto não localizada no modal para {nome_atual}")
                     except Exception as e:
-                        logging.warning(f"⚠️ Falha ao baixar/salvar foto de {nome_atual}: {e}")
+                        logging.warning(f" Falha ao baixar/salvar foto de {nome_atual}: {e}")
                         foto_url_real = None
                         img_path = None
 
@@ -622,19 +622,19 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
                     conn.commit()
                     novos_registros_encontrados_pagina += 1
 
-                    print(f"✅ Salvo: {nome_atual} | Data: {desapareceu_em}")
+                    print(f" Salvo: {nome_atual} | Data: {desapareceu_em}")
 
                     webdriver.ActionChains(driver).send_keys(Keys.ESCAPE).perform()
                     time.sleep(0.5)
 
                 except Exception as e:
-                    logging.error(f"❌ Erro no card {index}: {e}")
+                    logging.error(f" Erro no card {index}: {e}")
                     webdriver.ActionChains(driver).send_keys(Keys.ESCAPE).perform()
 
                 index += 1
 
             if novos_registros_encontrados_pagina <= 0:
-                print("ℹ️ Nenhum novo registro nesta página. Avançando...")
+                print(" Nenhum novo registro nesta página. Avançando...")
 
             try:
                 next_button = driver.find_element(
@@ -654,7 +654,7 @@ def scrape_cnpd(conn, cursor, stop_on_duplicate=True):
         if os.path.exists(plugin_file):
             os.remove(plugin_file)
 
-    print("✅ Scraping CNPD finalizado.")
+    print(" Scraping CNPD finalizado.")
 
 
     #Fim da função de CNPD
@@ -685,15 +685,15 @@ def main():
     stop_on_duplicate = True
     
 
-    print(f"📊 Registros atuais no banco: {total}")
+    print(f" Registros atuais no banco: {total}")
     if stop_on_duplicate:
-        print("🔎 Modo incremental (parar ao encontrar duplicata).")
+        print(" Modo incremental (parar ao encontrar duplicata).")
     else:
-        print("🆕 Modo completo (varrendo todas as páginas).")
+        print(" Modo completo (varrendo todas as páginas).")
     scrape_desaparecidos_brasil(conn, cursor, stop_on_duplicate) 
     scrape_cnpd(conn, cursor, stop_on_duplicate) 
     
-    print("\n 🚀 Varredura de todas as fontes concluída.")
+    print("\n  Varredura de todas as fontes concluída.")
     
     consulta_nao_especificados(cursor)
 

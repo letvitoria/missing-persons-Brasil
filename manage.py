@@ -42,26 +42,26 @@ def agendar_tarefa_scraping():
         scraper_main()
         logging.info("--- [AGENDADO] SCRAPING DIÁRIO CONCLUÍDO ---")
             #Após atualizar o mapa (scraping), executar os scripts auxiliares, se disponíveis
-    #     try:
-    #         if ENVIAR_FF_DISPONIVEL:
-    #             logging.info("Executando script: enviar_ff.py")
-    #             runpy.run_path(ENVIAR_FF_PATH, run_name="__main__")
-    #             logging.info("Script enviar_ff.py concluído")
-    #         else:
-    #             logging.warning("Script enviar_ff.py não encontrado; pulando execução")
-    #     except Exception as e:
-    #         logging.error(f"Erro ao executar enviar_ff.py: {e}", exc_info=True)
+        try:
+            if ENVIAR_FF_DISPONIVEL:
+                logging.info("Executando script: enviar_ff.py")
+                runpy.run_path(ENVIAR_FF_PATH, run_name="__main__")
+                logging.info("Script enviar_ff.py concluído")
+            else:
+                logging.warning("Script enviar_ff.py não encontrado; pulando execução")
+        except Exception as e:
+            logging.error(f"Erro ao executar enviar_ff.py: {e}", exc_info=True)
 
-    #     try:
-    #         if INACTIVATE_CARDS_DISPONIVEL:
-    #             logging.info("Executando script: inactivate_cards.py")
-    #             runpy.run_path(INACTIVATE_CARDS_PATH, run_name="__main__")
-    #             logging.info("Script inactivate_cards.py concluído")
-    #         else:
-    #             logging.warning("Script inactivate_cards.py não encontrado; pulando execução")
+        try:
+            if INACTIVATE_CARDS_DISPONIVEL:
+                logging.info("Executando script: inactivate_cards.py")
+                runpy.run_path(INACTIVATE_CARDS_PATH, run_name="__main__")
+                logging.info("Script inactivate_cards.py concluído")
+            else:
+                logging.warning("Script inactivate_cards.py não encontrado; pulando execução")
 
-    #     except Exception as e:
-    #         logging.error(f"Erro ao executar inactivate_cards.py: {e}", exc_info=True)
+        except Exception as e:
+            logging.error(f"Erro ao executar inactivate_cards.py: {e}", exc_info=True)
     except Exception as e:
         logging.error(f"[AGENDADO] ERRO AO EXECUTAR SCRAPING DIÁRIO: {e}", exc_info=True)
 
@@ -83,11 +83,6 @@ if __name__ == "__main__":
     scheduler.add_job(agendar_tarefa_scraping, trigger='cron', hour=10, minute=00)
     scheduler.start()
     logging.info("Agendador iniciado. O scraping rodará diariamente às 10:00h")
-    
-    logging.info(" [INICIALIZAÇÃO] Executando o scraping pela primeira vez... ---")
-    # Rodamos o scraper na inicialização para popular o banco imediatamente
-    agendar_tarefa_scraping()
-    logging.info("[INICIALIZAÇÃO] Scraping inicial concluído. ---")
     
     # Iniciando servidor web
     logging.info("Iniciando servidor Web")

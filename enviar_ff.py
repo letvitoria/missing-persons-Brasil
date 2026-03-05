@@ -41,7 +41,7 @@ cursor = conn.cursor()
 # Detalhes de autenticação básica
 username = 'linux'  # Alterado
 password = 'ubuntuff2025'     # Alterado
-# Watchlist 21
+
 
 # Codificar o par username:password em base64 para a autenticação básica
 credentials = f'{username}:{password}'

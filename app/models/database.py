@@ -270,8 +270,8 @@ def mostrar_estatisticas_por_estado(cursor):
 
 def atualizar_status_desaparecidosbrasil():
     """
-    Atualiza o status para 'OK' de todos os registros
-    cuja fonte seja 'desaparecidosbrasil.org' e status atual seja 'new'.
+    Atualiza o status para 'new' de todos os registros
+    cuja fonte seja 'desaparecidosbrasil.org' e status atual seja 'OK'.
     Retorna a quantidade de registros atualizados.
     """
     conn = connection_db()
@@ -281,7 +281,7 @@ def atualizar_status_desaparecidosbrasil():
         cursor.execute("""
             UPDATE desaparecidos
             SET status = 'new'
-            WHERE fonte = 'desaparecidosbrasil.org'
+            WHERE fonte = 'cnpd.mj.gov.br'
               AND status = 'OK'
         """)
         atualizados = cursor.rowcount
@@ -304,7 +304,7 @@ if __name__ == "__main__":
     print("--- EXECUTANDO SCRIPT DE BANCO DE DADOS DIRETAMENTE ---")
     init_db()
     #apagar_registros_cnpd()
-    #atualizar_status_desaparecidosbrasil()
+    atualizar_status_desaparecidosbrasil()
     mostrar_estatisticas_por_estado(connection_db().cursor())
     #apagar_desaparecido_por_nome('nome_completo')
     print("--- SCRIPT DE BANCO DE DADOS CONCLUÍDO ---")

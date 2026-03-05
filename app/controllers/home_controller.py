@@ -89,12 +89,15 @@ class HomeController:
         '''
         print("\nGerando mapeamento...")
         df_dados = df_dados_normalizados.copy() # Usa os dados recebidos
+        print(f"DEBUG _gerar_mapa: df_dados shape: {df_dados.shape}")
 
         # Calcula o valor máximo para o range
         if not df_dados.empty:
             valor_maximo = df_dados['quantidade'].max()
         else:
             valor_maximo = 100 
+        
+        print(f"DEBUG _gerar_mapa: valor_maximo: {valor_maximo}")
         
         # Renomeia a coluna 'uf' (que veio do get_dados_mapa) para 'id'
         if 'uf' in df_dados.columns:
@@ -106,41 +109,55 @@ class HomeController:
 
         #Carrega o GeoJSON
         geojson_path = os.path.join(current_app.static_folder, 'scripts', 'brazil_geo.json')
+        print(f"DEBUG _gerar_mapa: geojson_path: {geojson_path}")
         
         try:
             with open(geojson_path, 'r', encoding='utf-8') as f:
                 geojson = json.load(f)
+                print(f"DEBUG _gerar_mapa: GeoJSON carregado com {len(geojson['features'])} features")
         except FileNotFoundError:
             print(f"Arquivo {geojson_path} não encontrado. Verifique o caminho.")
             return f"<h1>Erro: Arquivo GeoJSON não encontrado em {geojson_path}</h1>"
         
         #Lógica para incluir todos os estados
+        print("DEBUG _gerar_mapa: Criando df_completo com todos os estados...")
         todos_os_estados = {
             feature['id']: feature['properties']['name'] 
             for feature in geojson['features']
         }
+        print(f"DEBUG _gerar_mapa: {len(todos_os_estados)} estados no GeoJSON")
         df_completo = pd.DataFrame(list(todos_os_estados.items()), columns=['id', 'estado_geojson'])
         
         # Merge dos dados do banco (df_dados) com o GeoJSON (df_completo)
+        print("DEBUG _gerar_mapa: Fazendo merge dos dados...")
         df_mapa = pd.merge(df_completo, df_dados[['id', 'quantidade', 'estado']], on='id', how='left')
         df_mapa['quantidade'].fillna(0, inplace=True)
+        print(f"DEBUG _gerar_mapa: df_mapa após merge: {df_mapa.shape}")
         
         # Usa o nome do estado vindo do banco para o hover_name
         # Se for nulo, usa o nome do GeoJSON
         df_mapa['hover_name'] = df_mapa['estado'].fillna(df_mapa['estado_geojson'])
 
-
-        fig = px.choropleth(
-            df_mapa,
-            geojson=geojson,
-            locations='id',         
-            featureidkey="id",     
-            color='quantidade',
-            hover_name='hover_name', 
-            color_continuous_scale="blues",
-            title='<b>Mapeamento de desaparecidos no Brasil</b>',
-            labels={'quantidade': 'Nº de Desaparecidos', 'hover_name': 'Estado'}
-        ) 
+        print("DEBUG _gerar_mapa: Criando figura Plotly...")
+        try:
+            fig = px.choropleth(
+                df_mapa,
+                geojson=geojson,
+                locations='id',         
+                featureidkey="id",     
+                color='quantidade',
+                hover_name='hover_name', 
+                color_continuous_scale="blues",
+                title='<b>Mapeamento de desaparecidos no Brasil</b>',
+                labels={'quantidade': 'Nº de Desaparecidos', 'hover_name': 'Estado'}
+            )
+            print("DEBUG _gerar_mapa: Figura criada com sucesso")
+        except Exception as e:
+            print(f"ERRO ao criar figura Plotly: {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return f"<h1>Erro ao criar mapa Plotly: {str(e)}</h1>"
+        
         fig.update_geos(
             fitbounds="locations",
             visible=False
@@ -172,7 +189,9 @@ class HomeController:
             )
         )
         
-        map_html = fig.to_html(full_html = False, include_plotlyjs='cdn') 
+        print("DEBUG _gerar_mapa: Gerando HTML...")
+        map_html = fig.to_html(full_html = False, include_plotlyjs='cdn')
+        print("DEBUG _gerar_mapa: HTML gerado com sucesso")
         return map_html
 
     def index(self):
@@ -190,16 +209,25 @@ class HomeController:
 
             query = "SELECT estado, COUNT(*) as quantidade FROM desaparecidos GROUP BY estado"
             df_dados_normalizados = database.get_dados_mapa(query, conn_local)
+            print(f"DEBUG: df_dados_normalizados shape: {df_dados_normalizados.shape}")
+            print(f"DEBUG: colunas: {df_dados_normalizados.columns.tolist()}")
 
             stats_html = self._gerar_estatisticas_html(df_dados_normalizados)
             mapa_html = self._gerar_mapa_html(df_dados_normalizados)
             
         except sqlite3.Error as e:
                  print(f"Erro de Banco de Dados ao gerar a página: {e}")
+                 import traceback
+                 traceback.print_exc()
         except FileNotFoundError as e:
                  print(f"Erro de Arquivo não encontrado: {e}")
+                 import traceback
+                 traceback.print_exc()
                  mapa_html = f"<div style='padding: 20px; text-align: center;'><h1>Erro Crítico: Arquivo GeoJSON não encontrado.</h1></div>"
         except Exception as e:
+             print(f"Erro inesperado ao gerar a página: {type(e).__name__}: {str(e)}")
+             import traceback
+             traceback.print_exc()
              logging.exception("Erro inesperado ao gerar a página")
         finally:
                  if conn_local:
